@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { getAllArticles } from '@/data/articles';
-import { CEFR_REPRESENTATIVE_VOCAB } from '@/domain/levels';
+import { bandLabelOf, CEFR_REPRESENTATIVE_VOCAB } from '@/domain/levels';
 import { recommendFor } from '@/domain/recommend';
 import { useCompletedArticleIds } from '@/hooks/use-completed-articles';
 import { useTheme } from '@/hooks/use-theme';
@@ -94,7 +94,7 @@ export default function TodayScreen() {
         </ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
           {userLevel.assessed
-            ? `根据你的水平 ${userLevel.level}(约 ${userVocab} 词)为你挑选`
+            ? `你的水平:${bandLabelOf(userVocab)},推荐按"高 1 档"挑选`
             : '先做水平评估,推荐会更贴合你的词汇量'}
         </ThemedText>
       </View>

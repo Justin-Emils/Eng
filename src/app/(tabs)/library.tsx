@@ -10,7 +10,8 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { getAllArticles } from '@/data/articles';
 import { remoteArticles } from '@/data/articles/remote-registry';
-import { CEFR_LEVELS } from '@/domain/levels';
+import { LEVEL_BANDS } from '@/domain/levels';
+import { difficultyOf } from '@/domain/difficulty';
 import { useCompletedArticleIds } from '@/hooks/use-completed-articles';
 import { useTheme } from '@/hooks/use-theme';
 import { loadRemoteArticles } from '@/storage/remote-articles';
@@ -64,17 +65,18 @@ export default function LibraryScreen() {
       return [{ key: 'all', title: '', data: filtered }];
     }
     if (mode === 'level') {
+      // 按细分难度档(11 档)分组,而不是粗 CEFR(6 档跨度太大)
       const map = new Map<string, Article[]>();
       for (const a of filtered) {
-        const k = a.difficulty.level;
+        const k = difficultyOf(a).band.id;
         const arr = map.get(k) ?? [];
         arr.push(a);
         map.set(k, arr);
       }
-      return CEFR_LEVELS.filter((l) => map.has(l)).map((l) => ({
-        key: l,
-        title: `${l} · 词汇 ${(map.get(l) ?? [])[0]?.difficulty.vocab ?? ''}`,
-        data: map.get(l)!,
+      return LEVEL_BANDS.filter((b) => map.has(b.id)).map((b) => ({
+        key: b.id,
+        title: `${b.id} ${b.label.replace(/^\S+\s*/, '')} · ${b.min}–${b.max} 词`,
+        data: map.get(b.id)!,
       }));
     }
     // topic:用第一个话题分组

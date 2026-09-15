@@ -20,6 +20,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { getArticleById } from '@/data/articles';
 import { offlineDictionary, type LookupResult } from '@/domain/dictionary';
 import { CEFR_REPRESENTATIVE_VOCAB } from '@/domain/levels';
+import { difficultyOf } from '@/domain/difficulty';
 import { splitSentences, extractWords } from '@/domain/wordmark';
 import { isStudyCandidate } from '@/domain/wordlevel';
 import { useTheme } from '@/hooks/use-theme';
@@ -174,7 +175,13 @@ export default function ArticleReaderScreen() {
   }
 
   const d = article.difficulty;
-  const meta = [`${d.level}`, `词汇 ${d.vocab}`, `${d.wordCount} 词`, `约 ${d.minutes} 分钟`];
+  const diff = difficultyOf(article);
+  const meta = [
+    `难度 ${diff.band.id}`,
+    `约 ${diff.requiredVocab} 词`,
+    `${d.wordCount} 词`,
+    `约 ${d.minutes} 分钟`,
+  ];
   const chips = [...meta, ...article.topicTags];
 
   const handleWordPress = (word: string, sentence?: string) => {

@@ -5,6 +5,7 @@ import { ArticleCover } from '@/components/article-cover';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { difficultyOf } from '@/domain/difficulty';
 import type { Article } from '@/types';
 
 /**
@@ -49,7 +50,7 @@ export function LatestStrip({
                   {a.title}
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                  {a.difficulty.level} · {a.difficulty.minutes} 分钟
+                  {difficultyOf(a).band.id} · {a.difficulty.minutes} 分钟
                 </ThemedText>
               </View>
             </ThemedView>

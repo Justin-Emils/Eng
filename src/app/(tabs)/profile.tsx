@@ -13,6 +13,7 @@ import { wordsToCsv } from '@/domain/export';
 import { computeStreak } from '@/domain/stats';
 import { useDailyCorpus } from '@/hooks/use-daily-corpus';
 import { useTheme } from '@/hooks/use-theme';
+import { bandLabelOf } from '@/domain/levels';
 import {
   getAllCheckedArticleIds,
   getCheckedArticleIdsOn,
@@ -257,8 +258,8 @@ export default function ProfileScreen() {
                 <ThemedText type="small" themeColor="textSecondary">
                   {userLevel
                     ? userLevel.assessed
-                      ? `${userLevel.level} · 约 ${userLevel.vocab ?? '–'} 词量`
-                      : '未评估(默认 B1),点按重新评估'
+                      ? `${bandLabelOf(userLevel.vocab ?? 0)} · 推荐按高 1 档`
+                      : '未评估(默认按 B1 中级推荐),点按开始评估'
                     : '加载中…'}
                 </ThemedText>
               </View>

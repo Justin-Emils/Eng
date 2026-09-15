@@ -77,3 +77,73 @@ export function cefrGap(a: CefrLevel, b: CefrLevel): number {
 /** 默认水平(用户跳过评估时):B1,约 2800 词 */
 export const DEFAULT_USER_LEVEL: CefrLevel = 'B1';
 export const DEFAULT_USER_VOCAB = CEFR_REPRESENTATIVE_VOCAB[DEFAULT_USER_LEVEL];
+
+/* ------------------------------------------------------------------ *
+ * 细分难度档(11 档)
+ *
+ * 为什么:原来只有 6 档 CEFR,跨度极大(如 B2 = 3500–5500 词,横跨 2000 词),
+ * "B2"这个标签对"这篇到底适不适合我"几乎没有信息量。
+ * 这里把 300–12000 词切成 11 档、每档跨度 400–1200 词(考研区间更细),
+ * 推荐与展示统一按档位比较,给出"刚好 / 略难 / 偏难"的判断。
+ * ------------------------------------------------------------------ */
+
+/** 细分难度档位 */
+export interface LevelBand {
+  /** 档位代码,如 'B1+' */
+  id: string;
+  /** 展示名,如 'B1+ 中级上' */
+  label: string;
+  /** 该档词汇量下限(含) */
+  min: number;
+  /** 该档词汇量上限(不含,最后一档为无穷) */
+  max: number;
+}
+
+/** 11 档细分(考研常用区间 3200–5800 被分成 4 档,便于精确匹配) */
+export const LEVEL_BANDS: readonly LevelBand[] = [
+  { id: 'A1', label: 'A1 入门', min: 300, max: 800 },
+  { id: 'A1+', label: 'A1+ 初阶', min: 800, max: 1200 },
+  { id: 'A2', label: 'A2 基础', min: 1200, max: 1800 },
+  { id: 'A2+', label: 'A2+ 进阶基础', min: 1800, max: 2500 },
+  { id: 'B1', label: 'B1 中级', min: 2500, max: 3200 },
+  { id: 'B1+', label: 'B1+ 中级上', min: 3200, max: 4000 },
+  { id: 'B2', label: 'B2 中高级', min: 4000, max: 4800 },
+  { id: 'B2+', label: 'B2+ 中高级上', min: 4800, max: 5800 },
+  { id: 'C1', label: 'C1 高级', min: 5800, max: 7000 },
+  { id: 'C1+', label: 'C1+ 高级上', min: 7000, max: 8500 },
+  { id: 'C2', label: 'C2 精通', min: 8500, max: 12000 },
+];
+
+/** 该档对应的粗 CEFR(兼容旧字段与旧数据) */
+export function coarseCefrOfBand(bandId: string): CefrLevel {
+  const base = bandId.replace('+', '');
+  return (CEFR_LEVELS.includes(base as CefrLevel) ? base : 'B1') as CefrLevel;
+}
+
+/** 词汇量 → 档位 */
+export function bandOf(vocab: number): LevelBand {
+  const v = Number.isFinite(vocab) ? vocab : DEFAULT_USER_VOCAB;
+  for (const b of LEVEL_BANDS) {
+    if (v < b.max) return b;
+  }
+  return LEVEL_BANDS[LEVEL_BANDS.length - 1];
+}
+
+/** 词汇量 → 档位序号(0 起,越小越简单) */
+export function bandIndexOf(vocab: number): number {
+  const band = bandOf(vocab);
+  const idx = LEVEL_BANDS.findIndex((b) => b.id === band.id);
+  return idx < 0 ? 5 : idx;
+}
+
+/** 档位展示:如 "B1+ 中级上(3200–4000 词)" */
+export function bandLabelOf(vocab: number): string {
+  const b = bandOf(vocab);
+  const last = b.id === LEVEL_BANDS[LEVEL_BANDS.length - 1].id;
+  return `${b.label}(${b.min}–${last ? '12000+' : b.max} 词)`;
+}
+
+/** 两档相差几档(带符号:正数表示后者更难) */
+export function bandGap(a: number, b: number): number {
+  return bandIndexOf(b) - bandIndexOf(a);
+}

@@ -52,3 +52,6 @@ wordlists/*.csv
 # 本地构建工具链(SDK/JDK/Gradle 缓存)
 .gradle/
 local.properties
+
+# 开发脚本的临时产物
+scripts/out/

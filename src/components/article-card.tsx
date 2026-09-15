@@ -6,17 +6,20 @@ import { ChipRow } from '@/components/chip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { difficultyOf } from '@/domain/difficulty';
 import type { Article } from '@/types';
 
 /**
  * 文章卡片(文章库/首页推荐):
- * 顶部为该文章专属渐变色封面(emoji + 主色调),下方标题/摘要/徽章/来源。
+ * 顶部为该文章专属渐变色封面,下方标题/摘要/徽章/来源。
+ * 徽章用**细分难度档 + 所需词汇量**(覆盖率口径),而不是粗 CEFR。
  * completed = 已读 ✓。
  */
 export function ArticleCard({ article, completed }: { article: Article; completed?: boolean }) {
   const router = useRouter();
+  const diff = difficultyOf(article);
   const d = article.difficulty;
-  const chips = [`${d.level}`, `${d.vocab} 词量`, `约 ${d.minutes} 分钟`];
+  const chips = [`难度 ${diff.band.id}`, `约 ${diff.requiredVocab} 词`, `${d.minutes} 分钟`];
 
   return (
     <Pressable

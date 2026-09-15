@@ -8,7 +8,8 @@
  */
 
 import type { RawArticle } from '@/data/articles/build';
-import { vocabToCefr } from '@/domain/levels';
+import { estimateDifficulty } from '@/domain/difficulty';
+import { coarseCefrOfBand } from '@/domain/levels';
 import { wordFreqThreshold } from '@/domain/wordlevel';
 import { extractWords } from '@/domain/wordmark';
 import type { CefrLevel } from '@/types';
@@ -48,19 +49,13 @@ export function tagsFromText(paragraphs: string[]): string[] {
 }
 
 /**
- * 估算一段文本的学习难度:取各单词"词频门槛"(无门槛词忽略)的平均,
- * 映射回词汇量区间。纯口语短词会拉低,学术词拉高,粗估即可。
+ * 估算一段文本的学习难度。
+ * 采用与全站一致的**覆盖率口径**(difficulty.ts):读懂 95% 实词所需词汇量,
+ * 再映射到粗 CEFR 存入语料字段(细分档位在运行时按同一指标计算)。
  */
 export function estimateLevel(paragraphs: string[]): { level: CefrLevel; vocab: number } {
-  const words = extractWords(paragraphs.join(' '));
-  const thresholds: number[] = [];
-  for (const w of words) {
-    const t = wordFreqThreshold(w);
-    if (t != null) thresholds.push(t);
-  }
-  const avg = thresholds.length > 0 ? thresholds.reduce((a, b) => a + b, 0) / thresholds.length : 3000;
-  const vocab = Math.round(Math.max(1000, Math.min(12000, avg)));
-  return { level: vocabToCefr(vocab), vocab };
+  const info = estimateDifficulty(paragraphs);
+  return { level: coarseCefrOfBand(info.band.id), vocab: info.requiredVocab };
 }
 
 /** 生词密度(命中"考研词表且非基础高频"的词占 unique 词比例),供筛选 */
