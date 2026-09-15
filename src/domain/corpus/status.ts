@@ -37,8 +37,12 @@ export function setCorpusRunning() {
   setStatus({ kind: 'running', detail: '正在抓取公版短文并切分入库…', updatedAt: Date.now() });
 }
 
-export function setCorpusDone(count: number) {
-  setStatus({ kind: 'done', detail: `已入库 ${count} 篇`, updatedAt: Date.now() });
+export function setCorpusDone(count: number, note?: string) {
+  setStatus({
+    kind: 'done',
+    detail: `已入库 ${count} 篇${note ? ` · 来源:${note}` : ''}`,
+    updatedAt: Date.now(),
+  });
 }
 
 export function setCorpusNoop() {

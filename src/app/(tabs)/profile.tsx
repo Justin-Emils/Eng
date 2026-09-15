@@ -224,6 +224,26 @@ export default function ProfileScreen() {
           <ThemedText type="small" themeColor="textSecondary">
             每日首次打开 App 自动更新;来源为 Project Gutenberg 公版书籍,自动切分/标注后进入文章库。
           </ThemedText>
+
+          {/* 语料源诊断:哪条通、耗时多少(手机上排查抓不到文章用) */}
+          <Pressable
+            onPress={() => void daily.testSources()}
+            disabled={daily.probing}
+            style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedText type="small" themeColor="accent">
+              {daily.probing ? '测试中…' : '测试语料源 ›'}
+            </ThemedText>
+          </Pressable>
+          {daily.probes
+            ? daily.probes.map((p) => (
+                <ThemedText
+                  key={p.name}
+                  type="small"
+                  themeColor={p.ok ? 'accent' : 'textSecondary'}>
+                  {p.ok ? '✓' : '✗'} {p.name} · {p.ms}ms · {p.note}
+                </ThemedText>
+              ))
+            : null}
         </ThemedView>
 
         {/* 我的水平 */}
