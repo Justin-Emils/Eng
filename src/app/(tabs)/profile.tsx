@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Avatar } from '@/components/avatar';
 import { SettingRow } from '@/components/setting-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -23,7 +24,8 @@ import {
   getCheckinDateKeys,
   todayKey,
 } from '@/storage/checkins';
-import { getSettings, saveDailyGoal, saveNickname, type DailyGoal } from '@/storage/settings';
+import { getAccount, joinedDays, saveAccount, type AccountInfo } from '@/storage/account';
+import { getSettings, saveDailyGoal, type DailyGoal } from '@/storage/settings';
 import { getUserLevel } from '@/storage/user';
 import { clearWords, getWords } from '@/storage/words';
 import type { Article, UserLevel } from '@/types';
@@ -60,9 +62,11 @@ export default function ProfileScreen() {
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [goal, setGoal] = useState<DailyGoal | null>(null);
   const [userLevel, setUserLevel] = useState<UserLevel | null>(null);
-  const [nickname, setNickname] = useState('');
   const [nicknameDraft, setNicknameDraft] = useState('');
   const [exported, setExported] = useState(false);
+  const [account, setAccount] = useState<AccountInfo | null>(null);
+  /** 常读话题(按已读文章统计,取前 3) */
+  const [topTopics, setTopTopics] = useState<{ tag: string; count: number }[]>([]);
 
   const refresh = useCallback(() => {
     let active = true;
@@ -76,18 +80,38 @@ export default function ProfileScreen() {
         getUserLevel(),
       ]);
       if (!active) return;
+      const readArticles = resolveArticles([...allChecked]);
       setStats(
         computeStats({
           todayArticles: resolveArticles(todayIds),
-          allReadArticles: resolveArticles([...allChecked]),
+          allReadArticles: readArticles,
           words,
           streakDays: computeStreak(dateKeys, todayKey()),
         }),
       );
+
+      // 常读话题统计
+      const counter = new Map<string, number>();
+      for (const a of readArticles) {
+        for (const t of a.topicTags) counter.set(t, (counter.get(t) ?? 0) + 1);
+      }
+      setTopTopics(
+        [...counter.entries()]
+          .map(([tag, count]) => ({ tag, count }))
+          .sort((x, y) => y.count - x.count)
+          .slice(0, 3),
+      );
+
+      // 本地账号(旧版本的 settings.nickname 迁移过来,避免昵称丢失)
+      let acc = await getAccount();
+      if (!acc.nickname && settings.nickname) {
+        acc = await saveAccount({ nickname: settings.nickname });
+      }
+      setAccount(acc);
+      setNicknameDraft(acc.nickname);
+
       setGoal(settings.dailyGoal);
       setUserLevel(level);
-      setNickname(settings.nickname ?? '');
-      setNicknameDraft(settings.nickname ?? '');
     };
     load().catch(() => {});
     return () => {
@@ -104,8 +128,9 @@ export default function ProfileScreen() {
 
   const handleSaveNickname = async () => {
     const name = nicknameDraft.trim();
-    await saveNickname(name);
-    setNickname(name);
+    const next = await saveAccount({ nickname: name });
+    setAccount(next);
+    setNicknameDraft(next.nickname);
   };
 
   const handleExport = async () => {
@@ -154,14 +179,12 @@ export default function ProfileScreen() {
           我的
         </ThemedText>
 
-        {/* 个人卡:昵称 / 水平 / 连续打卡 */}
+        {/* 个人卡:头像 / 昵称 / 水平 / 关键数据;点头像进账号页 */}
         <ThemedView type="backgroundElement" style={styles.card}>
           <View style={styles.personRow}>
-            <View style={styles.avatar}>
-              <ThemedText style={styles.avatarText}>
-                {(nickname || '读').slice(0, 1).toUpperCase()}
-              </ThemedText>
-            </View>
+            <Pressable onPress={() => router.push('/account')} hitSlop={6}>
+              <Avatar emoji={account?.avatar ?? '📚'} size={56} />
+            </Pressable>
             <View style={styles.personBody}>
               <View style={styles.nickRow}>
                 <TextInput
@@ -175,12 +198,15 @@ export default function ProfileScreen() {
                   maxLength={12}
                   returnKeyType="done"
                 />
-                <ThemedText type="small" themeColor="textSecondary">
-                  纯本地
-                </ThemedText>
+                <Pressable onPress={() => router.push('/account')} hitSlop={6}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    账号 ›
+                  </ThemedText>
+                </Pressable>
               </View>
               <ThemedText type="small" themeColor="textSecondary">
                 {levelText}
+                {account ? ` · 加入 ${joinedDays(account)} 天` : ''}
               </ThemedText>
             </View>
           </View>
@@ -190,6 +216,28 @@ export default function ProfileScreen() {
             <StatTile label="累计读完" value={`${stats?.totalArticlesCompleted ?? 0} 篇`} />
             <StatTile label="生词本" value={`${stats?.wordCount ?? 0} 词`} />
           </View>
+        </ThemedView>
+
+        {/* 学习画像:把已有数据串成"我的学习轨迹" */}
+        <SectionTitle text="学习画像" />
+        <ThemedView type="backgroundElement" style={styles.card}>
+          <View style={styles.statRow}>
+            <StatTile label="累计阅读" value={`${stats?.totalWordsRead ?? 0} 词`} />
+            <StatTile
+              label="平均每篇"
+              value={
+                stats && stats.totalArticlesCompleted > 0
+                  ? `${Math.round(stats.totalWordsRead / stats.totalArticlesCompleted)} 词`
+                  : '–'
+              }
+            />
+            <StatTile label="已掌握" value={`${stats?.masteredCount ?? 0} 词`} />
+          </View>
+          <ThemedText type="small" themeColor="textSecondary">
+            {topTopics.length > 0
+              ? `常读话题:${topTopics.map((t) => `${t.tag}(${t.count})`).join(' · ')}`
+              : '读完几篇后,这里会显示你偏好的话题'}
+          </ThemedText>
         </ThemedView>
 
         {/* 学习设置 */}
@@ -308,6 +356,18 @@ export default function ProfileScreen() {
                 </ThemedText>
               ))
             : null}
+        </ThemedView>
+
+        {/* 账号 */}
+        <SectionTitle text="账号" />
+        <ThemedView type="backgroundElement" style={styles.list}>
+          <SettingRow
+            label="账号与同步"
+            sublabel="当前为本地账号,数据仅存本机;云同步(注册/登录)开发中"
+            value="本地 ›"
+            onPress={() => router.push('/account')}
+            last
+          />
         </ThemedView>
 
         {/* 数据 */}
