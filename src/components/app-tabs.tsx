@@ -55,6 +55,9 @@ export default function AppTabs() {
       /* 不要指示胶囊:原来 indicatorColor 用强调色,而选中图标/文字也是强调色,
          结果是"蓝底压蓝图标"→ 选中图标看不见。选中态靠颜色 + 加粗标签表达即可。 */
       disableIndicator
+      /* 关掉 Android 的水波纹:圆形波纹会超出 tab 项高度被裁成"缺了顶部的圆",很丑;
+         点击反馈改由选中态(图标/文字变蓝 + 加粗)表达 */
+      rippleColor="transparent"
       labelVisibilityMode="labeled"
       labelStyle={{
         default: { color: theme.textSecondary },

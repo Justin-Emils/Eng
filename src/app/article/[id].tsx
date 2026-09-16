@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -163,6 +163,36 @@ export default function ArticleReaderScreen() {
     };
   }, []);
 
+  /**
+   * 点词:查词 + 设置学习状态 + 打开词典卡。
+   * 必须用 useCallback 保持引用稳定 —— SentenceBlock/WordText 已用 memo,
+   * 否则每次渲染都产生新函数,导致整篇文章重渲染、卡片出现明显延迟。
+   * 注意:必须在任何提前 return 之前声明(hooks 顺序必须一致)。
+   */
+  const handleWordPress = useCallback(
+    (word: string, sentence?: string) => {
+      const cache = lookupCacheRef.current;
+      const key = word.toLowerCase();
+      let result = cache.get(key);
+      if (!result) {
+        result = offlineDictionary.lookup(word);
+        cache.set(key, result);
+      }
+      // 学习状态:已学(今日或历史)> 已会 > 候选生词 > 无
+      const isKnownWord = knownSet.has(key);
+      const isLearned = learnedSet.has(key);
+      const isCandidate = isStudyCandidate(word, userVocab);
+      setDictStudyState(
+        isLearned ? 'learned' : isKnownWord ? 'known' : isCandidate ? 'candidate' : null,
+      );
+      setDictKaoyan(isCandidate);
+      setPendingSentence(sentence);
+      setDictResult(result);
+      setDictVisible(true);
+    },
+    [knownSet, learnedSet, userVocab],
+  );
+
   if (!article) {
     return (
       <ThemedView style={[styles.center, { paddingTop: insets.top }]}>
@@ -183,27 +213,6 @@ export default function ArticleReaderScreen() {
     `约 ${d.minutes} 分钟`,
   ];
   const chips = [...meta, ...article.topicTags];
-
-  const handleWordPress = (word: string, sentence?: string) => {
-    const cache = lookupCacheRef.current;
-    const key = word.toLowerCase();
-    let result = cache.get(key);
-    if (!result) {
-      result = offlineDictionary.lookup(word);
-      cache.set(key, result);
-    }
-    // 学习状态:已学(今日或历史)> 已会 > 候选生词 > 无
-    const isKnownWord = knownSet.has(key);
-    const isLearned = learnedSet.has(key);
-    const isCandidate = isStudyCandidate(word, userVocab);
-    setDictStudyState(
-      isLearned ? 'learned' : isKnownWord ? 'known' : isCandidate ? 'candidate' : null,
-    );
-    setDictKaoyan(isStudyCandidate(word, userVocab));
-    setPendingSentence(sentence);
-    setDictResult(result);
-    setDictVisible(true);
-  };
 
   /** 标记今日学习(进入学习流;正文立即加粗并从候选蓝中移除) */
   const handleMarkLearned = async (headword: string) => {
@@ -359,7 +368,7 @@ export default function ArticleReaderScreen() {
                 lineHeight={lineHeight}
                 candidateSet={candidateSet}
                 todayLearnedSet={learnedToday}
-                onWordPress={(word) => handleWordPress(word, sentence)}
+                onWordPress={handleWordPress}
               />
             ))}
           </View>

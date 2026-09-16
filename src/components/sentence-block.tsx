@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,8 +11,12 @@ import { translateSentence, type TranslationResult } from '@/domain/translate';
  * 句子级渲染块:
  * - 句子本体用 WordText 词级渲染(点词查词/学习);
  * - 句子右下角轻量「译」小按钮 → 该句下方展开对照译文(再点收起)。
+ *
+ * 用 memo 包住:点词弹出词典卡会更新阅读页状态,若不 memo,
+ * 整篇文章每个句子的所有词节点都会重渲染 → 卡片出现明显变慢。
+ * 因此 onWordPress 必须是**稳定引用**(父级用 useCallback),句子由本组件内部拼进回调。
  */
-export function SentenceBlock({
+export const SentenceBlock = memo(function SentenceBlock({
   sentence,
   fontSize,
   lineHeight,
@@ -27,10 +31,18 @@ export function SentenceBlock({
   candidateSet?: ReadonlySet<string>;
   /** 今日新学词集合(加粗) */
   todayLearnedSet?: ReadonlySet<string>;
-  onWordPress: (word: string) => void;
+  /** 点词:带上本句作为上下文 */
+  onWordPress: (word: string, sentence: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [result, setResult] = useState<TranslationResult | null>(null);
+
+  const handleWord = useCallback(
+    (word: string) => {
+      onWordPress(word, sentence);
+    },
+    [onWordPress, sentence],
+  );
 
   const toggleTranslate = useCallback(() => {
     if (expanded) {
@@ -59,7 +71,7 @@ export function SentenceBlock({
         lineHeight={lineHeight}
         candidateSet={candidateSet}
         todayLearnedSet={todayLearnedSet}
-        onWordPress={onWordPress}
+        onWordPress={handleWord}
       />
 
       <View style={styles.actionsRow}>
@@ -97,7 +109,7 @@ export function SentenceBlock({
       <View style={{ height: Spacing.two }} />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   block: {

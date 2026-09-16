@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { StyleSheet, Text, type TextStyle } from 'react-native';
 
 import { tokenize } from '@/domain/wordmark';
@@ -9,8 +10,10 @@ import { useTheme } from '@/hooks/use-theme';
  *  1. 今日新学词(todayLearned 命中):品牌蓝 + 加粗;
  *  2. 候选生词(candidateSet 命中):品牌蓝(纯色)。
  * 轻点单词 → onWordPress(word)。
+ *
+ * memo:未变的句子不随父级状态(如词典卡开关)重渲染 —— 这是点词后卡片能否"秒开"的关键。
  */
-export function WordText({
+export const WordText = memo(function WordText({
   text,
   fontSize,
   lineHeight,
@@ -59,7 +62,7 @@ export function WordText({
       })}
     </Text>
   );
-}
+});
 
 const styles = StyleSheet.create({
   para: {

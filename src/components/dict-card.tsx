@@ -63,8 +63,8 @@ export function DictCard({
       scale.setValue(0.92);
       fade.setValue(0);
       Animated.parallel([
-        Animated.timing(scale, { toValue: 1, duration: 160, useNativeDriver: true }),
-        Animated.timing(fade, { toValue: 1, duration: 160, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 110, useNativeDriver: true }),
+        Animated.timing(fade, { toValue: 1, duration: 110, useNativeDriver: true }),
       ]).start();
     }
   }, [visible, scale, fade]);
@@ -86,7 +86,7 @@ export function DictCard({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.root}>
         {/* 淡遮罩:原地淡入,点空白关闭 */}
         <Pressable style={styles.backdrop} onPress={onClose} />
