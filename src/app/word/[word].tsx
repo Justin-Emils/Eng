@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -10,11 +10,14 @@ import { offlineDictionary } from '@/domain/dictionary';
 import { isExternalWord } from '@/domain/external';
 import { useTheme } from '@/hooks/use-theme';
 import { useWordSaved } from '@/hooks/use-word-saved';
+import { getWords, removeWord, setWordStatus } from '@/storage/words';
+import type { WordItem } from '@/types';
 
 /**
  * 词条详情页(/word/[word]):
- * 从词典卡「详情 ›」进入,展示单词完整信息(音标/词性/中英释义/例句),
- * 支持加入/移出生词本;若带 articleId 可跳回来源文章。
+ * 从词典卡「详情 ›」或生词本行进入,展示单词完整信息(音标/词性/中英释义/例句),
+ * 并承担生词管理:加入/移出生词本、标记已掌握、删除。
+ * 若带 articleId 可跳回来源文章。
  */
 export default function WordDetailScreen() {
   const router = useRouter();
@@ -29,6 +32,50 @@ export default function WordDetailScreen() {
 
   const { saved, toggle } = useWordSaved(headword);
   const [saving, setSaving] = useState(false);
+  /** 已收藏时对应的生词条目(用于"标记掌握/删除") */
+  const [wordItem, setWordItem] = useState<WordItem | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const key = headword ? headword.toLowerCase() : '';
+    void (async () => {
+      // 未收藏(或没有词形)时无需查库;这里不直接同步 setState,避免级联渲染
+      const list = saved && key ? await getWords() : [];
+      const found = saved && key ? (list.find((w) => w.headword.toLowerCase() === key) ?? null) : null;
+      if (active) setWordItem(found);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [saved, headword]);
+
+  const mastered = wordItem?.status === 'mastered';
+
+  /** 标记已掌握 / 取消掌握(从生词本的主动操作移到这里) */
+  const handleToggleMastered = async () => {
+    if (!wordItem) return;
+    await setWordStatus(wordItem.id, mastered ? 'learning' : 'mastered');
+    const list = await getWords();
+    setWordItem(list.find((w) => w.id === wordItem.id) ?? null);
+  };
+
+  /** 从生词本删除(不可恢复,二次确认) */
+  const handleRemove = () => {
+    if (!wordItem) return;
+    Alert.alert('从生词本删除?', `「${wordItem.headword}」及其复习进度会被删除,阅读记录不受影响。`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            await removeWord(wordItem.id);
+            router.back();
+          })();
+        },
+      },
+    ]);
+  };
 
   const handleSave = async () => {
     if (!entry) return;
@@ -162,6 +209,30 @@ export default function WordDetailScreen() {
           </Pressable>
         ) : null}
 
+        {/* 生词管理(从生词本列表行移到详情页,避免列表里挤两个功能相近的按钮) */}
+        {wordItem ? (
+          <View style={styles.manageRow}>
+            <Pressable
+              onPress={() => void handleToggleMastered()}
+              style={({ pressed }) => [styles.manageBtnWrap, pressed && styles.pressed]}>
+              <ThemedView type="backgroundElement" style={styles.manageBtn}>
+                <ThemedText type="smallBold" themeColor={mastered ? 'textSecondary' : 'accent'}>
+                  {mastered ? '取消已掌握' : '标为已掌握'}
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
+            <Pressable
+              onPress={handleRemove}
+              style={({ pressed }) => [styles.manageBtnWrap, pressed && styles.pressed]}>
+              <ThemedView type="backgroundElement" style={styles.manageBtn}>
+                <ThemedText type="smallBold" themeColor="textSecondary">
+                  从生词本删除
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
+          </View>
+        ) : null}
+
         {params.articleId ? (
           <Pressable
             onPress={() => router.push(`/article/${params.articleId}`)}
@@ -286,5 +357,18 @@ const styles = StyleSheet.create({
   },
   pressed: {
     opacity: 0.6,
+  },
+  manageRow: {
+    flexDirection: 'row',
+    gap: Spacing.two + 2,
+    marginTop: Spacing.two,
+  },
+  manageBtnWrap: { flex: 1 },
+  manageBtn: {
+    minHeight: 44,
+    borderRadius: Spacing.two + 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.two,
   },
 });

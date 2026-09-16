@@ -10,7 +10,7 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { getArticleById } from '@/data/articles';
 import { useTheme } from '@/hooks/use-theme';
-import { countByStatus, getWords, removeWord, setWordStatus } from '@/storage/words';
+import { countByStatus, getWords } from '@/storage/words';
 import type { WordItem } from '@/types';
 
 /**
@@ -41,22 +41,6 @@ export default function WordsScreen() {
       };
     }, []),
   );
-
-  const handleRemove = async (id: string) => {
-    await removeWord(id);
-    const list = await getWords();
-    const counts = await countByStatus();
-    setWords(list);
-    setDueCount(counts.due);
-  };
-
-  const handleSetMastered = async (item: WordItem, mastered: boolean) => {
-    await setWordStatus(item.id, mastered ? 'mastered' : 'learning');
-    const list = await getWords();
-    const counts = await countByStatus();
-    setWords(list);
-    setDueCount(counts.due);
-  };
 
   return (
     <ThemedView style={styles.flex}>
@@ -104,8 +88,6 @@ export default function WordsScreen() {
               onWordPress={() =>
                 router.push({ pathname: '/word/[word]', params: { word: item.headword } })
               }
-              onToggleMastered={(mastered) => void handleSetMastered(item, mastered)}
-              onRemove={() => handleRemove(item.id)}
               onSourcePress={() =>
                 item.sourceArticleId && router.push(`/article/${item.sourceArticleId}`)
               }
@@ -124,14 +106,10 @@ export default function WordsScreen() {
 function WordRow({
   item,
   onWordPress,
-  onToggleMastered,
-  onRemove,
   onSourcePress,
 }: {
   item: WordItem;
   onWordPress: () => void;
-  onToggleMastered: (mastered: boolean) => void;
-  onRemove: () => void;
   onSourcePress: () => void;
 }) {
   const theme = useTheme();
@@ -185,24 +163,7 @@ function WordRow({
               </ThemedText>
             </View>
           )}
-          <View style={styles.rowActions}>
-            <Pressable
-              onPress={() => onToggleMastered(!mastered)}
-              hitSlop={6}
-              style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText type="small" themeColor="accent">
-                {mastered ? '取消掌握' : '标为掌握'}
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              onPress={onRemove}
-              hitSlop={8}
-              style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText type="small" themeColor="textSecondary">
-                删除
-              </ThemedText>
-            </Pressable>
-          </View>
+          {/* 管理操作(标记掌握/删除)移到词条详情页,列表行只保留"来源"入口,避免两个功能相近的按钮挤在一行 */}
         </View>
       </ThemedView>
     </Pressable>
