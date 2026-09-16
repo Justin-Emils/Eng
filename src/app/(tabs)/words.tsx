@@ -168,18 +168,22 @@ function WordRow({
 
         <View style={styles.rowFoot}>
           {source ? (
-            <Pressable
-              onPress={onSourcePress}
-              hitSlop={6}
-              style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText type="small" themeColor="accent" numberOfLines={1} style={styles.source}>
+            <Pressable onPress={onSourcePress} hitSlop={6} style={styles.sourceWrap}>
+              <ThemedText
+                type="small"
+                themeColor="accent"
+                numberOfLines={1}
+                ellipsizeMode="tail"
+                style={styles.source}>
                 来源:《{source.title}》
               </ThemedText>
             </Pressable>
           ) : (
-            <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-              详情 ›
-            </ThemedText>
+            <View style={styles.sourceWrap}>
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                详情 ›
+              </ThemedText>
+            </View>
           )}
           <View style={styles.rowActions}>
             <Pressable
@@ -285,14 +289,22 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     marginTop: Spacing.one,
   },
+  /**
+   * 来源那一段必须可收缩:flex:1 + minWidth:0,否则长标题会把卡片撑破
+   * (只在 Text 上写 flexShrink 不够 —— 它的父级 Pressable 会按内容撑宽)。
+   */
+  sourceWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
   source: {
-    flexShrink: 1,
     lineHeight: 20,
   },
   rowActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three,
+    flexShrink: 0,
   },
   pressed: {
     opacity: 0.6,
