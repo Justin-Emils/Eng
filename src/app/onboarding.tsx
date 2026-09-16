@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PrimaryButton } from '@/components/primary-button';
@@ -30,6 +30,8 @@ export default function OnboardingScreen() {
   const [saving, setSaving] = useState(false);
 
   const finish = async (goAssess: boolean) => {
+    if (saving) return;
+    Keyboard.dismiss();
     setSaving(true);
     try {
       if (nickname.trim()) await saveNickname(nickname);
@@ -40,6 +42,9 @@ export default function OnboardingScreen() {
       } else {
         router.replace('/(tabs)');
       }
+    } catch {
+      // 写入失败也不能卡住引导:直接进主页,设置用默认值
+      router.replace('/(tabs)');
     } finally {
       setSaving(false);
     }
@@ -52,7 +57,9 @@ export default function OnboardingScreen() {
           styles.content,
           { paddingTop: insets.top + Spacing.five, paddingBottom: insets.bottom + Spacing.five },
         ]}
-        keyboardShouldPersistTaps="handled">
+        /* always:键盘弹出时点击按钮也立即生效(否则第一下只会收起键盘,像是"点不动") */
+        keyboardShouldPersistTaps="always"
+        keyboardDismissMode="on-drag">
         {/* 进度点 */}
         <View style={styles.dots}>
           {[0, 1, 2].map((i) => (
@@ -115,10 +122,20 @@ export default function OnboardingScreen() {
                 ]}
                 returnKeyType="next"
                 maxLength={12}
+                onSubmitEditing={() => {
+                  Keyboard.dismiss();
+                  setStep(1);
+                }}
               />
             </View>
 
-            <PrimaryButton label="下一步" onPress={() => setStep(1)} />
+            <PrimaryButton
+              label="下一步"
+              onPress={() => {
+                Keyboard.dismiss();
+                setStep(1);
+              }}
+            />
           </>
         ) : step === 1 ? (
           <>
