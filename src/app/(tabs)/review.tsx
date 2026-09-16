@@ -1,8 +1,9 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -37,6 +38,7 @@ const EMPTY_TALLY: SessionTally = { total: 0, remembered: 0, fuzzy: 0, forgotten
 export default function ReviewScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [queue, setQueue] = useState<WordItem[]>([]);
@@ -135,14 +137,18 @@ export default function ReviewScreen() {
         </ThemedText>
       </View>
 
-      {phase === 'idle' ? (
+      {phase === 'idle' && learningCount === 0 ? (
+        <EmptyState
+          emoji="🔁"
+          title="还没有可复习的词"
+          description="读文章时把生词标记为「学习」,它们会按 1/2/4/7/15… 天的间隔自动排进复习队列。"
+          actionLabel="去读一篇"
+          onAction={() => router.push('/(tabs)/library')}
+        />
+      ) : phase === 'idle' ? (
         <View style={styles.centerBox}>
           <ThemedText type="subtitle">🔁</ThemedText>
-          <ThemedText type="smallBold">
-            {learningCount > 0
-              ? `生词本有 ${learningCount} 词可复习`
-              : '生词本是空的,先去阅读收藏吧'}
-          </ThemedText>
+          <ThemedText type="smallBold">{`生词本有 ${learningCount} 词可复习`}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.centerHint}>
             看到单词先回忆中文,想不起再看例句提示或选「不记得」查看详情
           </ThemedText>

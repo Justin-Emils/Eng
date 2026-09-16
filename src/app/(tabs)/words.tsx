@@ -3,6 +3,8 @@ import { useCallback, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState } from '@/components/empty-state';
+import { SkeletonList } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -71,16 +73,16 @@ export default function WordsScreen() {
 
       {words === null ? (
         <View style={styles.empty}>
-          <ThemedText themeColor="textSecondary">加载中…</ThemedText>
+          <SkeletonList count={4} />
         </View>
       ) : words.length === 0 ? (
-        <View style={styles.empty}>
-          <ThemedText type="subtitle">📭</ThemedText>
-          <ThemedText themeColor="textSecondary">生词本是空的</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.emptyHint}>
-            阅读短文时轻点单词 → 加入生词本,就会出现在这里。
-          </ThemedText>
-        </View>
+        <EmptyState
+          emoji="📭"
+          title="生词本还是空的"
+          description="阅读短文时轻点单词 → 选「学习」,词就会进来并按遗忘曲线安排复习。"
+          actionLabel="去读一篇"
+          onAction={() => router.push('/(tabs)/library')}
+        />
       ) : (
         <FlatList
           data={words}

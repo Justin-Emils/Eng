@@ -68,3 +68,20 @@ export async function getCompletedArticleIds(): Promise<Set<string>> {
     return new Set();
   }
 }
+
+/**
+ * 最近在读、但还没读完的文章(按更新时间倒序)。
+ * 供首页「继续阅读」卡片使用;只返回读过至少一段的,避免把刚点开就退出的算进去。
+ */
+export async function getInProgressArticles(): Promise<ReadingProgress[]> {
+  try {
+    const raw = await AsyncStorage.getItem(PROGRESS_KEY);
+    if (!raw) return [];
+    const map = JSON.parse(raw) as Record<string, ReadingProgress>;
+    return Object.values(map)
+      .filter((p) => !p.completed && (p.paragraphIndex ?? 0) > 0)
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  } catch {
+    return [];
+  }
+}

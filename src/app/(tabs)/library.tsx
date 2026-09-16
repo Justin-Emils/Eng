@@ -4,6 +4,7 @@ import { Pressable, SectionList, StyleSheet, TextInput, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArticleCard } from '@/components/article-card';
+import { EmptyState } from '@/components/empty-state';
 import { LatestStrip } from '@/components/latest-strip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -170,9 +171,21 @@ export default function LibraryScreen() {
           { paddingBottom: insets.bottom + BottomTabInset + Spacing.three },
         ]}
         ListEmptyComponent={
-          <View style={styles.empty}>
-            <ThemedText themeColor="textSecondary">没有匹配的文章</ThemedText>
-          </View>
+          query.trim() ? (
+            <EmptyState
+              emoji="🔍"
+              title="没有匹配的文章"
+              description={`没找到和「${query.trim()}」相关的标题或摘要,换个关键词试试。`}
+              actionLabel="清除搜索"
+              onAction={() => setQuery('')}
+            />
+          ) : (
+            <EmptyState
+              emoji="📚"
+              title="这里还没有文章"
+              description="公版短文每天自动更新;下拉刷新或稍后再来看看。"
+            />
+          )
         }
       />
     </ThemedView>
