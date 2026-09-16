@@ -16,10 +16,17 @@ export const Colors = {
     textSecondary: '#60646C',
     /** 品牌/强调色(学习类 App 常用清爽蓝),用于重点、按钮、高亮 */
     accent: '#208AEF',
-    /** 品牌色的浅色衬底 */
-    accentSoft: '#DCEFFC',
+    /**
+     * 填充按钮的底色(与 accent 分开的原因:白字压在 accent #208AEF 上
+     * 对比度只有 3.53;深色主题 accent 变成亮蓝后更是只剩 2.63 → 字看不清)
+     */
+    accentStrong: '#0F5CC0',
+    /** 填充按钮上的文字色(与 accentStrong 对比度 ≥ 4.5) */
+    onAccentStrong: '#ffffff',
+    /** 品牌色的浅色衬底(足够浅,保证 accent 文字压在它上面也有 ≥3 对比度) */
+    accentSoft: '#E3F2FD',
     /** 分隔线/描边(弱) */
-    border: '#E5E7EB',
+    border: '#D5D9DF',
   },
   dark: {
     text: '#ffffff',
@@ -28,8 +35,11 @@ export const Colors = {
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
     accent: '#4DA3FF',
+    /** 深色下按钮:亮蓝底 + 深墨蓝字(对比度 6.47,不用白字) */
+    accentStrong: '#4DA3FF',
+    onAccentStrong: '#0A1D33',
     accentSoft: '#17324D',
-    border: '#2E3135',
+    border: '#3A3D42',
   },
 } as const;
 

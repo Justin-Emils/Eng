@@ -264,10 +264,10 @@ export default function AssessmentScreen() {
               onPress={() => void answer(true)}
               style={({ pressed }) => [
                 styles.gradeBtn,
-                { backgroundColor: theme.accent },
+                { backgroundColor: theme.accentStrong },
                 pressed && styles.pressed,
               ]}>
-              <ThemedText type="smallBold" style={styles.rememberText}>
+              <ThemedText type="smallBold" themeColor="onAccentStrong" style={styles.rememberText}>
                 认识 ✓
               </ThemedText>
             </Pressable>
@@ -439,7 +439,6 @@ const styles = StyleSheet.create({
   },
   rememberText: {
     fontSize: 18,
-    color: '#ffffff',
     fontWeight: '700',
   },
   pressed: { opacity: 0.6 },

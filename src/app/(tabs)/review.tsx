@@ -270,10 +270,10 @@ export default function ReviewScreen() {
                 onPress={() => void gradeCurrent('good')}
                 style={({ pressed }) => [
                   styles.gradeBtn,
-                  { backgroundColor: theme.accent },
+                  { backgroundColor: theme.accentStrong },
                   pressed && styles.pressed,
                 ]}>
-                <ThemedText type="smallBold" style={styles.rememberText}>
+                <ThemedText type="smallBold" themeColor="onAccentStrong" style={styles.rememberText}>
                   记得 ✓
                 </ThemedText>
               </Pressable>
@@ -281,10 +281,10 @@ export default function ReviewScreen() {
                 onPress={() => void gradeCurrent('easy')}
                 style={({ pressed }) => [
                   styles.gradeBtn,
-                  { backgroundColor: theme.accent },
+                  { backgroundColor: theme.accentStrong },
                   pressed && styles.pressed,
                 ]}>
-                <ThemedText type="smallBold" style={styles.rememberText}>
+                <ThemedText type="smallBold" themeColor="onAccentStrong" style={styles.rememberText}>
                   很熟
                 </ThemedText>
               </Pressable>
@@ -332,10 +332,10 @@ export default function ReviewScreen() {
               onPress={advance}
               style={({ pressed }) => [
                 styles.continueBtn,
-                { backgroundColor: theme.accent },
+                { backgroundColor: theme.accentStrong },
                 pressed && styles.pressed,
               ]}>
-              <ThemedText type="smallBold" style={styles.rememberText}>
+              <ThemedText type="smallBold" themeColor="onAccentStrong" style={styles.rememberText}>
                 继续学习 →
               </ThemedText>
             </Pressable>
@@ -446,7 +446,6 @@ const styles = StyleSheet.create({
   },
   rememberText: {
     fontSize: 18,
-    color: '#ffffff',
     fontWeight: '700',
   },
 

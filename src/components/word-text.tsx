@@ -30,7 +30,7 @@ export function WordText({
   const theme = useTheme();
   const tokens = tokenize(text);
 
-  const wordStyle: TextStyle = { fontSize, lineHeight };
+  const wordStyle: TextStyle = { fontSize, lineHeight, color: theme.text };
 
   return (
     <Text style={[styles.para, wordStyle]}>
