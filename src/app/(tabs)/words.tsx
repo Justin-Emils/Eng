@@ -139,10 +139,12 @@ function WordRow({
             </ThemedView>
           </View>
         </View>
-        <ThemedText style={styles.zh}>{item.zh}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-          {item.en}
-        </ThemedText>
+        <ThemedText style={styles.zh}>{item.zh || '（离线词典暂无释义）'}</ThemedText>
+        {item.en ? (
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+            {item.en}
+          </ThemedText>
+        ) : null}
 
         <View style={styles.rowFoot}>
           {source ? (

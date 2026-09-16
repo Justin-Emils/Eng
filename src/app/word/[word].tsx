@@ -28,7 +28,8 @@ export default function WordDetailScreen() {
 
   const result = offlineDictionary.lookup(rawWord);
   const entry = result?.entry;
-  const headword = entry?.headword;
+  /** 当前词形:命中词典用 headword,未收录则用查询词本身(未收录也要能收藏/管理) */
+  const headword = entry?.headword ?? result?.query ?? rawWord;
 
   const { saved, toggle } = useWordSaved(headword);
   const [saving, setSaving] = useState(false);
@@ -78,17 +79,18 @@ export default function WordDetailScreen() {
   };
 
   const handleSave = async () => {
-    if (!entry) return;
+    if (!headword) return;
     setSaving(true);
     try {
       await toggle({
-        word: result?.query || entry.headword,
-        headword: entry.headword,
-        phonetic: entry.phonetic,
-        pos: entry.pos,
-        zh: entry.zh,
-        en: entry.en,
-        example: entry.example,
+        word: result?.query || headword,
+        headword,
+        // 未收录词:释义留空,先存下来(词条页/复习时可再补)
+        phonetic: entry?.phonetic,
+        pos: entry?.pos ?? '',
+        zh: entry?.zh ?? '',
+        en: entry?.en ?? '',
+        example: entry?.example,
         sourceArticleId: params.articleId ?? '',
         sourceSentence: undefined,
       });
@@ -191,10 +193,10 @@ export default function WordDetailScreen() {
           )}
         </View>
 
-        {/* 操作区 */}
-        {entry ? (
+        {/* 操作区:未收录词也能加入生词本(释义暂空,可稍后补) */}
+        {headword ? (
           <Pressable
-            onPress={handleSave}
+            onPress={() => void handleSave()}
             disabled={saving}
             style={({ pressed }) => pressed && styles.pressed}>
             <ThemedView
@@ -207,6 +209,12 @@ export default function WordDetailScreen() {
               </ThemedText>
             </ThemedView>
           </Pressable>
+        ) : null}
+
+        {headword && !entry ? (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.emptyNote}>
+            离线词典未收录该词:仍可加入生词本,释义留空,复习时再补。
+          </ThemedText>
         ) : null}
 
         {/* 生词管理(从生词本列表行移到详情页,避免列表里挤两个功能相近的按钮) */}
@@ -362,6 +370,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Spacing.two + 2,
     marginTop: Spacing.two,
+  },
+  emptyNote: {
+    marginTop: Spacing.two,
+    lineHeight: 18,
   },
   manageBtnWrap: { flex: 1 },
   manageBtn: {

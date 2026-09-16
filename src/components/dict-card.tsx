@@ -45,7 +45,12 @@ export function DictCard({
 }) {
   const theme = useTheme();
   const entry = result?.entry;
-  const headword = entry?.headword;
+  /**
+   * 当前操作的词形:命中词典用 headword,未收录则用查询词本身。
+   * 未收录也要能加入生词本 / 标记学习(否则按钮看起来能点却毫无反应)。
+   */
+  const displayWord = entry ? entry.headword : (result?.query ?? '');
+  const headword = displayWord;
 
   const { saved, toggle } = useWordSaved(headword);
 
@@ -65,15 +70,16 @@ export function DictCard({
   }, [visible, scale, fade]);
 
   const handleSave = async () => {
-    if (!entry) return;
+    if (!displayWord) return;
     await toggle({
-      word: result?.query || entry.headword,
-      headword: entry.headword,
-      phonetic: entry.phonetic,
-      pos: entry.pos,
-      zh: entry.zh,
-      en: entry.en,
-      example: entry.example,
+      word: result?.query || displayWord,
+      headword: displayWord,
+      // 未收录词:释义留空,先存下来(可在词条详情/复习时补),来源句一并保留
+      phonetic: entry?.phonetic,
+      pos: entry?.pos ?? '',
+      zh: entry?.zh ?? '',
+      en: entry?.en ?? '',
+      example: entry?.example,
       sourceArticleId: source.articleId,
       sourceSentence: source.sentence,
     });
@@ -149,15 +155,16 @@ export function DictCard({
               </>
             )}
 
-            {/* 学习状态区:候选生词 → 邀请加入今日学习;已学/已会 → 状态徽章 */}
-            {entry && studyState ? (
+            {/* 学习状态区:候选生词 → 邀请加入今日学习;已学/已会 → 状态徽章
+                (未收录的词同样可以标记学习:它可能正是超出词表的生词) */}
+            {studyState ? (
               studyState === 'candidate' ? (
                 <View style={styles.studyRow}>
                   <ThemedText type="small" themeColor="textSecondary" style={styles.studyHint}>
                     高于你当前词汇量,值得学
                   </ThemedText>
                   <Pressable
-                    onPress={() => onMarkLearned?.(entry.headword)}
+                    onPress={() => onMarkLearned?.(displayWord)}
                     style={({ pressed }) => pressed && styles.pressed}>
                     <ThemedView type="backgroundSelected" style={styles.smallBtn}>
                       <ThemedText type="smallBold" themeColor="accent">
@@ -166,7 +173,7 @@ export function DictCard({
                     </ThemedView>
                   </Pressable>
                   <Pressable
-                    onPress={() => onMarkKnown?.(entry.headword)}
+                    onPress={() => onMarkKnown?.(displayWord)}
                     style={({ pressed }) => pressed && styles.pressed}>
                     <ThemedText type="small" themeColor="textSecondary">
                       我会了
@@ -184,11 +191,11 @@ export function DictCard({
               )
             ) : null}
 
-            {/* 小按钮行:详情 / 收藏 */}
+            {/* 小按钮行:详情 / 收藏 / 关闭(未收录词也允许详情与收藏) */}
             <View style={styles.actions}>
-              {entry ? (
+              {displayWord ? (
                 <Pressable
-                  onPress={() => onOpenDetail(entry.headword)}
+                  onPress={() => onOpenDetail(displayWord)}
                   style={({ pressed }) => pressed && styles.pressed}>
                   <ThemedView type="backgroundSelected" style={styles.smallBtn}>
                     <ThemedText type="smallBold" style={{ color: theme.accent }}>
@@ -201,8 +208,8 @@ export function DictCard({
               )}
 
               <Pressable
-                onPress={handleSave}
-                disabled={!entry}
+                onPress={() => void handleSave()}
+                disabled={!displayWord}
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedView
                   type={saved ? 'backgroundElement' : 'backgroundSelected'}

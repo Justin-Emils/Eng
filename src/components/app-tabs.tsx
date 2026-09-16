@@ -52,7 +52,9 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={theme.background}
       iconColor={{ default: theme.textSecondary, selected: theme.accent }}
-      indicatorColor={theme.accent}
+      /* 不要指示胶囊:原来 indicatorColor 用强调色,而选中图标/文字也是强调色,
+         结果是"蓝底压蓝图标"→ 选中图标看不见。选中态靠颜色 + 加粗标签表达即可。 */
+      disableIndicator
       labelVisibilityMode="labeled"
       labelStyle={{
         default: { color: theme.textSecondary },
