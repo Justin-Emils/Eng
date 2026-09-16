@@ -25,7 +25,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 CSV = ROOT / "wordlists" / "ecdict.csv"
 OUT = ROOT / "src" / "data" / "word-freq.ts"
-MAX_RANK = 40000
+# 名次 > 30000 的词映射到的难度已接近上限(≈9300+),留着收益极小却占体积
+MAX_RANK = 30000
+# 变形词只收录高频那批;低频词的变形由词干还原(lookupCandidates)兜住
+INFLECTION_MAX_RANK = 8000
 
 
 def parse_num(s):
@@ -77,10 +80,16 @@ def main():
             rank = min(cands)
             if rank > MAX_RANK:
                 continue
-            for form in [word] + exchange_forms(row.get("exchange")):
-                prev = table.get(form)
-                if prev is None or rank < prev:
-                    table[form] = rank
+            # 原词始终收录
+            prev = table.get(word)
+            if prev is None or rank < prev:
+                table[word] = rank
+            # 变形词只在高频区间收录(体积与准确率的折中)
+            if rank <= INFLECTION_MAX_RANK:
+                for form in exchange_forms(row.get("exchange")):
+                    got = table.get(form)
+                    if got is None or rank < got:
+                        table[form] = rank
 
     lines = ["%s %d" % (w, table[w]) for w in sorted(table)]
     body = "\n".join(lines)
