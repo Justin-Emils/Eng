@@ -260,43 +260,51 @@ console.log(`    舒适阅读上限:所需词汇量 ≤ ${fit.comfortCeiling} �
 console.log(`    学习区(93%–96%):所需词汇量 ${fit.zoneFrom}–${fit.zoneTo} 词`);
 
 console.log(`\n================ 5. 补词顺序:缺口大小 vs 性价比(用户 ${userVocab} 词) ================`);
-const roi = profileMod.bandRoi(userVocab, articles);
-console.log('  档位            未知去重词  学完可提升覆盖率   每词收益      平均复现');
-for (const r of roi) {
+
+// 模拟"评估曲线显示 5500 档断层"的典型用户:4200 档只认识 80%,5500 档只有 20%
+const level = {
+  vocab: userVocab,
+  level: 'B2',
+  assessed: true,
+  updatedAt: 0,
+  mode: 'quick',
+  rounds: [
+    { threshold: 1500, total: 5, known: 5 },
+    { threshold: 3000, total: 5, known: 5 },
+    { threshold: 4200, total: 5, known: 4 },
+    { threshold: 5500, total: 5, known: 1 },
+  ],
+  answers: 20,
+  knownAnswers: 15,
+};
+
+const curveMod = await import(`file://${path.join(OUT, 'domain/knowledge.js')}`);
+const curve = curveMod.curveForLevel(level);
+
+const roiHard = profileMod.bandRoi(userVocab, articles);
+const roiCurve = profileMod.bandRoi(userVocab, articles, curve);
+
+console.log('  档位            语料去重词  未知词(默认曲线 → 评估拟合)  学完提升覆盖率   每词收益      平均复现');
+for (let i = 0; i < roiCurve.length; i += 1) {
+  const c = roiCurve[i];
+  const h = roiHard[i];
   console.log(
-    `    ${r.label.padEnd(14)} ${String(r.unknownUnique).padStart(5)} 个 ${r.coverageGainPct.toFixed(2).padStart(9)}% ${r.gainPerWord.toFixed(3).padStart(10)}%/词 ${r.avgRepetition.toFixed(1).padStart(8)} 次`,
+    `    ${c.label.padEnd(14)} ${String(c.uniqueWords).padStart(6)} ${String(h.unknownUnique).padStart(10)} →${String(c.unknownUnique).padStart(5)} 个 ${c.coverageGainPct.toFixed(2).padStart(12)}% ${c.gainPerWord.toFixed(3).padStart(10)}%/词 ${c.avgRepetition.toFixed(1).padStart(8)} 次`,
   );
 }
+console.log('  (默认曲线 = 没有评估明细时,以词汇量为中心的 logistic;两者都已是概率加权,不再是硬阈值一刀切)');
 
-const candidates = roi.filter((r) => r.unknownUnique >= 15);
+const candidates = roiCurve.filter((r) => r.unknownUnique >= 15);
 if (candidates.length > 0) {
   const best = candidates.reduce((a, b) => (b.gainPerWord > a.gainPerWord ? b : a));
+  const gapRoi = roiCurve.find((r) => r.threshold === 5500);
   console.log(`\n  → 性价比最高:${best.label}(每学 1 个词约多认识 ${best.gainPerWord.toFixed(3)}% 文本)`);
 
-  // 模拟"评估曲线显示 5500 档断层"的典型用户,对比两种口径给出的建议
-  const level = {
-    vocab: userVocab,
-    level: 'B2',
-    assessed: true,
-    updatedAt: 0,
-    mode: 'quick',
-    rounds: [
-      { threshold: 1500, total: 5, known: 5 },
-      { threshold: 3000, total: 5, known: 5 },
-      { threshold: 4200, total: 5, known: 4 },
-      { threshold: 5500, total: 5, known: 1 },
-    ],
-    answers: 20,
-    knownAnswers: 15,
-  };
   const naive = profileMod.buildLearnerProfile(level);
-  const withRoi = profileMod.buildLearnerProfile(level, { roi });
-
-  const gapRoi = roi.find((r) => r.threshold === 5500);
-  console.log('\n  同一个用户(曲线显示 5500 档只有 20%):');
+  const withRoi = profileMod.buildLearnerProfile(level, { roi: roiCurve });
   if (gapRoi) {
     console.log(
-      `    5500 档:未知 ${gapRoi.unknownUnique} 个 · 每词收益 ${gapRoi.gainPerWord.toFixed(3)}% · 平均复现 ${gapRoi.avgRepetition.toFixed(1)} 次`,
+      `    5500 档:期望未知 ${gapRoi.unknownUnique} 个 · 每词收益 ${gapRoi.gainPerWord.toFixed(3)}% · 平均复现 ${gapRoi.avgRepetition.toFixed(1)} 次`,
     );
     if (gapRoi.gainPerWord > 0) {
       console.log(`    性价比差距:${best.label} 每词收益是它的 ${(best.gainPerWord / gapRoi.gainPerWord).toFixed(1)} 倍`);
@@ -308,3 +316,28 @@ if (candidates.length > 0) {
     if (t.kind === 'note') console.log(`      note: ${t.text}`);
   }
 }
+
+console.log(`\n================ 6. 概率曲线:词汇量不再是一刀切 ================`);
+console.log(`  曲线来源:${curve.source}  ·  锚点(评估实测):`);
+for (const a of curve.anchors) {
+  console.log(`    ${String(a.threshold).padStart(5)} 档 → 实测掌握 ${(a.rate * 100).toFixed(0)}%`);
+}
+console.log('  拟合后的认识概率 pKnown(t):');
+for (const t of [1000, 1500, 3000, 4200, 4847, 5500, 6500, 7500, 9500, 12000]) {
+  const p = curve.pKnown(t);
+  const bar = '█'.repeat(Math.round(p * 20)).padEnd(20, '·');
+  console.log(`    门槛 ${String(t).padStart(5)} → ${bar} ${(p * 100).toFixed(1).padStart(5)}%`);
+}
+console.log('  → 低于词汇量的档位不再默认"全会"(4200 档只有 80%),高于的也不再默认"全不会"(5500 档仍有 20%)');
+
+// 具体一篇文章:两种口径算出的理解率差多少
+const sample = articles[0];
+const hardCoverage = difficultyMod.coverageAt(sample.paragraphs, userVocab);
+const curveCoverage = curveMod.expectedCoverage(sample.paragraphs, curve);
+const hardUnknown = Math.round((1 - hardCoverage) * 1000) / 10;
+const curveUnknown = Math.round((1 - curveCoverage) * 1000) / 10;
+console.log(`\n  以《${sample.title.slice(0, 36)}》为例:`);
+console.log(`    硬阈值口径(旧实现):预计认识 ${(hardCoverage * 100).toFixed(1)}%(生词率 ${hardUnknown}%)`);
+console.log(`    概率加权口径(新):预计认识 ${(curveCoverage * 100).toFixed(1)}%(生词率 ${curveUnknown}%)`);
+console.log(`    → 差 ${((curveCoverage - hardCoverage) * 100).toFixed(1)} 个百分点:低档位的"漏网之词"被算进来了`);
+

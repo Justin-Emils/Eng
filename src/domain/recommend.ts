@@ -14,11 +14,11 @@
  */
 
 import {
-  coverageAt,
   coverageFitLabel,
   difficultyOf,
   learnableWords,
 } from '@/domain/difficulty';
+import { defaultCurve, expectedCoverage, type KnowledgeCurve } from '@/domain/knowledge';
 import { bandIndexOf, bandLabelOf } from '@/domain/levels';
 import { isStudyCandidate } from '@/domain/wordlevel';
 import { extractWords } from '@/domain/wordmark';
@@ -40,6 +40,11 @@ export interface RecommendInput {
   articles: Article[];
   /** 用户词汇量(量化后的点估计) */
   userVocab: number;
+  /**
+   * 掌握概率曲线(见 domain/knowledge)。给了就按"概率加权理解率"匹配 ——
+   * 4200 档的词不会因为词汇量够就被判成全认识。不给则退化为硬阈值版本。
+   */
+  curve?: KnowledgeCurve;
   /** 已学过的词(小写) */
   learned: ReadonlySet<string>;
   /** 已认识(用户标"我会了",小写) */
@@ -138,11 +143,13 @@ export function recommendFor(input: RecommendInput): Recommendation[] {
   const count = input.count ?? 3;
   const fallback = input.allowFallback ?? true;
   const userBandIdx = bandIndexOf(input.userVocab);
+  const curve = input.curve ?? defaultCurve(input.userVocab);
 
   const rows: Row[] = input.articles
     .map((article) => {
       const info = difficultyOf(article);
-      const coverage = coverageAt(article.paragraphs, input.userVocab);
+      // 概率加权理解率:比"词汇量硬阈值"更接近真实阅读体验
+      const coverage = expectedCoverage(article.paragraphs, curve);
       const { learnable, examWords, noisy, samples } = learnableWords(
         article.paragraphs,
         input.userVocab,

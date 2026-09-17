@@ -15,7 +15,8 @@
  * 匹配时只作为兜底排序,不再作为主判据。
  */
 
-import { difficultyOf, coverageAt, thresholdOfWord } from '@/domain/difficulty';
+import { difficultyOf, thresholdOfWord } from '@/domain/difficulty';
+import { defaultCurve, expectedCoverage, type KnowledgeCurve } from '@/domain/knowledge';
 import { bandLabelOf, cefrToVocab, vocabToCefr } from '@/domain/levels';
 import { VOCAB_BANDS, bandLabel } from '@/domain/wordlevel';
 import { extractWords } from '@/domain/wordmark';
@@ -243,10 +244,22 @@ export interface BandRoi {
   avgRepetition: number;
 }
 
-/** 统计各档词的语料投入产出比(纯函数,词门槛结果内部缓存) */
-export function bandRoi(vocab: number, articles: readonly Article[]): BandRoi[] {
+/**
+ * 统计各档词的语料投入产出比(纯函数,词门槛结果内部缓存)。
+ *
+ * 传入 curve(掌握概率曲线)时按**概率加权**:4200 档的词不再因为"词汇量够"
+ * 就被算成全认识,而是按 pKnown(4200) 的实测掌握率折算期望未知词数 ——
+ * 这修正了"词汇量一刀切"的偏差。
+ */
+export function bandRoi(
+  vocab: number,
+  articles: readonly Article[],
+  curve?: KnowledgeCurve,
+): BandRoi[] {
   const bands = [...VOCAB_BANDS];
-  const perBand = new Map<number, { unique: Map<string, number>; unknown: Map<string, number> }>();
+  const pKnown = curve?.pKnown ?? defaultCurve(vocab).pKnown;
+  // unknown 存 { 出现次数, 期望权重(1-p) }
+  const perBand = new Map<number, { unique: Map<string, number>; unknown: Map<string, { occ: number; weight: number }> }>();
   for (const band of bands) perBand.set(band, { unique: new Map(), unknown: new Map() });
 
   const thresholdCache = new Map<string, number | null>();
@@ -266,20 +279,28 @@ export function bandRoi(vocab: number, articles: readonly Article[]): BandRoi[] 
       const band = bands.find((b) => threshold <= b) ?? bands[bands.length - 1];
       const entry = perBand.get(band)!;
       entry.unique.set(word, (entry.unique.get(word) ?? 0) + 1);
-      if (threshold > vocab) entry.unknown.set(word, (entry.unknown.get(word) ?? 0) + 1);
+
+      const weight = 1 - pKnown(threshold);
+      if (weight > 0.01) {
+        const prev = entry.unknown.get(word) ?? { occ: 0, weight };
+        entry.unknown.set(word, { occ: prev.occ + 1, weight });
+      }
     }
   }
 
   return bands.map((band) => {
     const entry = perBand.get(band)!;
-    const unknownTokens = [...entry.unknown.values()].reduce((sum, n) => sum + n, 0);
-    const unknownUnique = entry.unknown.size;
+    const unknownTokens = [...entry.unknown.values()].reduce(
+      (sum, u) => sum + u.occ * u.weight,
+      0,
+    );
+    const unknownUnique = [...entry.unknown.values()].reduce((sum, u) => sum + u.weight, 0);
     const coverageGainPct = totalTokens > 0 ? (unknownTokens / totalTokens) * 100 : 0;
     return {
       threshold: band,
       label: bandLabel(band),
       uniqueWords: entry.unique.size,
-      unknownUnique,
+      unknownUnique: Math.round(unknownUnique),
       coverageGainPct,
       gainPerWord: unknownUnique > 0 ? coverageGainPct / unknownUnique : 0,
       avgRepetition: unknownUnique > 0 ? unknownTokens / unknownUnique : 0,
@@ -447,11 +468,20 @@ export interface CorpusFit {
  * 刻意走实测而不是纯公式:公式要给词频分布假设,而语料池就在手边。
  * 样本太少(不足 3 篇)时退回按词汇量估算。
  */
-export function corpusFit(vocab: number, articles: readonly Article[]): CorpusFit {
+export function corpusFit(
+  vocab: number,
+  articles: readonly Article[],
+  curve?: KnowledgeCurve,
+): CorpusFit {
+  const effective = curve ?? defaultCurve(vocab);
   const rows: { required: number; coverage: number }[] = [];
   for (const article of articles) {
     const info = difficultyOf(article);
-    rows.push({ required: info.requiredVocab, coverage: coverageAt(article.paragraphs, vocab) });
+    // 概率加权理解率:低于词汇量的档位也可能有没掌握的词,高于的也可能掌握
+    rows.push({
+      required: info.requiredVocab,
+      coverage: expectedCoverage(article.paragraphs, effective),
+    });
   }
 
   if (rows.length < 3) {

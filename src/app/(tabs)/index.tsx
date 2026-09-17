@@ -14,6 +14,7 @@ import { getArticleById, getAllArticles } from '@/data/articles';
 import { hydrateRemoteArticles } from '@/data/articles/remote-registry';
 import { bandLabelOf, CEFR_REPRESENTATIVE_VOCAB } from '@/domain/levels';
 import { recommendFor } from '@/domain/recommend';
+import { curveForLevel } from '@/domain/knowledge';
 import { computeStreak } from '@/domain/stats';
 import { useCompletedArticleIds } from '@/hooks/use-completed-articles';
 import { useTheme } from '@/hooks/use-theme';
@@ -145,17 +146,21 @@ export default function TodayScreen() {
     [userLevel],
   );
 
+  /** 掌握概率曲线:用评估各档实测正确率拟合,推荐按概率加权理解率匹配 */
+  const curve = useMemo(() => curveForLevel(userLevel, userVocab), [userLevel, userVocab]);
+
   const picks = useMemo(
     () =>
       recommendFor({
         articles: getAllArticles(),
         userVocab,
+        curve,
         learned,
         known,
         count: 2,
         excludeIds: completedIds,
       }),
-    [userVocab, learned, known, completedIds],
+    [userVocab, curve, learned, known, completedIds],
   );
 
   const goalPercent =
