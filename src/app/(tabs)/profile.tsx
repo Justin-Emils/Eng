@@ -285,10 +285,22 @@ export default function ProfileScreen() {
           </View>
         </ThemedView>
 
-        {/* 学习画像:量化面板(词汇量 + 区间 + 分频段曲线 + 派生标签与建议) */}
+        {/* 学习画像:一个功能区承载量化数据(评估入口也在这里,不再分散到别的区块) */}
         <SectionTitle text="学习画像" />
         {profile ? (
-          <LearnerProfileCard profile={profile} />
+          <LearnerProfileCard
+            profile={profile}
+            reading={{
+              totalWordsRead: stats?.totalWordsRead ?? 0,
+              avgPerArticle:
+                stats && stats.totalArticlesCompleted > 0
+                  ? Math.round(stats.totalWordsRead / stats.totalArticlesCompleted)
+                  : null,
+              masteredCount: stats?.masteredCount ?? 0,
+              topics: topTopics.map((t) => `${t.tag}(${t.count})`).join(' · '),
+            }}
+            onAssess={() => router.push({ pathname: '/assessment', params: { from: 'profile' } })}
+          />
         ) : (
           <ThemedView type="backgroundElement" style={styles.card}>
             <ThemedText type="small" themeColor="textSecondary">
@@ -296,25 +308,6 @@ export default function ProfileScreen() {
             </ThemedText>
           </ThemedView>
         )}
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <View style={styles.statRow}>
-            <StatTile label="累计阅读" value={`${stats?.totalWordsRead ?? 0} 词`} />
-            <StatTile
-              label="平均每篇"
-              value={
-                stats && stats.totalArticlesCompleted > 0
-                  ? `${Math.round(stats.totalWordsRead / stats.totalArticlesCompleted)} 词`
-                  : '–'
-              }
-            />
-            <StatTile label="已掌握" value={`${stats?.masteredCount ?? 0} 词`} />
-          </View>
-          <ThemedText type="small" themeColor="textSecondary">
-            {topTopics.length > 0
-              ? `常读话题:${topTopics.map((t) => `${t.tag}(${t.count})`).join(' · ')}`
-              : '读完几篇后,这里会显示你偏好的话题'}
-          </ThemedText>
-        </ThemedView>
 
         {/* 学习设置 */}
         <SectionTitle text="学习设置" />
@@ -345,12 +338,12 @@ export default function ProfileScreen() {
             })}
           </View>
 
+          {/* 评估入口已并入上方「学习画像」卡,这里只显示匹配口径 */}
           <SettingRow
-            label="学习水平"
-            value={userLevel?.assessed ? '重新评估' : '去评估'}
-            onPress={() => router.push({ pathname: '/assessment', params: { from: 'profile' } })}
+            label="推荐匹配"
+            sublabel="按预测理解率匹配 · 目标 93%–96%(生词 4%–7%)"
+            value={profile ? `${profile.vocab} 词` : '–'}
           />
-          <SettingRow label="推荐难度" sublabel="按你的水平自动高 1 档" value={bandLabelOf(vocab).split(' ')[0]} />
           <SettingRow
             label="主题"
             sublabel="可跟随手机深色模式"

@@ -1,15 +1,20 @@
 /**
- * 量化画像卡片(评估结果页与「我的」页共用)。
+ * 量化画像卡片(评估结果页与「我的」页共用)—— **单块布局**。
  *
- * 展示三件量化数据 + 两条派生结论:
- *   1. 词汇量点估计与置信区间(带区间可视化条);
- *   2. 分频段掌握曲线 —— 画像的"形状",比总量更有信息量;
- *   3. 由曲线派生的标签(优势 / 断层 / 说明);
- *   4. 由数据派生的行动建议(不是写死的文案)。
- * CEFR / 细分档位作为参考层显示在最后,不作为主判据。
+ * 之前的版本内部拆成 4 张卡(词汇量 / 曲线 / 标签 / 参考层),外面还挂着一张阅读统计卡,
+ * 一屏下来 5 个方块,视觉上非常碎。现在合并为**一个功能区**,内部用细线分隔:
+ *
+ *   词汇量 + 区间条
+ *   ─────────────
+ *   分频段掌握曲线
+ *   ─────────────
+ *   派生标签 + 行动建议
+ *   ─────────────
+ *   阅读统计 / 常读话题 / 参考档位
+ *   [开始评估 / 重新评估]  ← 评估入口放在这里,不再藏到别的区块
  */
 
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -26,21 +31,34 @@ const TRAIT_COLORS = {
   dark: { strength: '#81C784', gap: '#FF8A80', note: '#B0B4BA' },
 } as const;
 
+/** 折叠进画像卡的阅读统计(不传则不显示这一段) */
+export interface ReadingSummary {
+  totalWordsRead: number;
+  avgPerArticle: number | null;
+  masteredCount: number;
+  /** 已格式化的常读话题,如 "科技(4) · 社会(3)" */
+  topics: string;
+}
+
 function pct(rate: number): string {
   return `${Math.round(rate * 100)}%`;
 }
 
 export function LearnerProfileCard({
   profile,
-  /** 精简模式(评估结果页用):不显示参考档位与提示语 */
-  compact = false,
+  /** 阅读统计段(「我的」页传入;评估结果页不需要) */
+  reading,
+  /** 评估入口(不传则不显示按钮行,如评估结果页) */
+  onAssess,
 }: {
   profile: LearnerProfile;
-  compact?: boolean;
+  reading?: ReadingSummary;
+  onAssess?: () => void;
 }) {
   const theme = useTheme();
   const scheme = useResolvedScheme();
   const traitColors = TRAIT_COLORS[scheme];
+  const divider = { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border };
 
   // 区间条:点估计位置 + 区间宽度(百分比)
   const span = SCALE_MAX - SCALE_MIN;
@@ -48,13 +66,27 @@ export function LearnerProfileCard({
   const highPct = Math.min(100, ((profile.high - SCALE_MIN) / span) * 100);
   const pointPct = Math.max(0, Math.min(100, ((profile.vocab - SCALE_MIN) / span) * 100));
 
+  const modeText =
+    profile.mode === 'fine' ? '精细评估' : profile.mode === 'pick' ? '自选档位' : '快速评估';
+
   return (
-    <View style={styles.wrap}>
-      {/* 1. 词汇量 + 区间 */}
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText type="small" themeColor="textSecondary">
-          估计词汇量
-        </ThemedText>
+    <ThemedView type="backgroundElement" style={styles.card}>
+      {/* ── 词汇量 + 区间 ── */}
+      <View style={styles.block}>
+        <View style={styles.headerRow}>
+          <ThemedText type="small" themeColor="textSecondary">
+            估计词汇量
+          </ThemedText>
+          {onAssess ? (
+            <Pressable onPress={onAssess} hitSlop={8} style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedText type="small" themeColor="accent">
+                {/* 还没有曲线 → 引导去评估;已有曲线 → 重新评估 */}
+                {profile.bands.length === 0 ? '去评估 ›' : '重新评估 ›'}
+              </ThemedText>
+            </Pressable>
+          ) : null}
+        </View>
+
         <View style={styles.vocabRow}>
           <ThemedText type="title" themeColor="accent" style={styles.vocab}>
             {profile.vocab}
@@ -62,13 +94,18 @@ export function LearnerProfileCard({
           <ThemedText type="smallBold" themeColor="textSecondary" style={styles.unit}>
             词
           </ThemedText>
+          <View style={styles.refChip}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.refChipText}>
+              参考 {profile.cefr}
+            </ThemedText>
+          </View>
         </View>
+
         <ThemedText type="small" themeColor="textSecondary">
-          区间 {profile.low}–{profile.high} 词 · 可信度{profile.confidence}
-          {profile.mode === 'fine' ? ' · 精细评估' : profile.mode === 'pick' ? ' · 自选档位' : ' · 快速评估'}
+          区间 {profile.low}–{profile.high} 词 · 可信度{profile.confidence} · {modeText}
         </ThemedText>
 
-        {/* 区间可视化:灰轨道 + 强调色区间段 + 点估计刻度 */}
+        {/* 区间可视化:灰轨道 + 区间段 + 点估计刻度 */}
         <View style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
           <View
             style={[
@@ -82,20 +119,12 @@ export function LearnerProfileCard({
           />
           <View style={[styles.point, { backgroundColor: theme.accent, left: `${pointPct}%` }]} />
         </View>
-        <View style={styles.scaleRow}>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.scaleText}>
-            300
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.scaleText}>
-            12000
-          </ThemedText>
-        </View>
-      </ThemedView>
+      </View>
 
-      {/* 2. 分频段掌握曲线 */}
+      {/* ── 分频段掌握曲线 ── */}
       {profile.bands.length > 0 ? (
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <ThemedText type="smallBold">分频段掌握情况</ThemedText>
+        <View style={[styles.block, styles.blockTop, divider]}>
+          <ThemedText type="smallBold">分频段掌握</ThemedText>
           {profile.bands.map((band) => (
             <View key={band.threshold} style={styles.bandRow}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.bandLabel}>
@@ -107,12 +136,7 @@ export function LearnerProfileCard({
                     styles.bandFill,
                     {
                       width: `${Math.max(2, band.rate * 100)}%`,
-                      backgroundColor:
-                        band.rate >= 0.8
-                          ? theme.accent
-                          : band.rate >= 0.5
-                            ? theme.accent
-                            : theme.textSecondary,
+                      backgroundColor: band.rate >= 0.5 ? theme.accent : theme.textSecondary,
                       opacity: band.rate >= 0.8 ? 1 : band.rate >= 0.5 ? 0.7 : 0.45,
                     },
                   ]}
@@ -126,17 +150,15 @@ export function LearnerProfileCard({
               </ThemedText>
             </View>
           ))}
-        </ThemedView>
+        </View>
       ) : null}
 
-      {/* 3. 派生标签 */}
-      {profile.traits.length > 0 ? (
-        <ThemedView type="backgroundElement" style={styles.card}>
+      {/* ── 派生标签 + 建议 ── */}
+      {profile.traits.length > 0 || profile.suggestion ? (
+        <View style={[styles.block, styles.blockTop, divider]}>
           {profile.traits.map((trait) => (
             <View key={trait.text} style={styles.traitRow}>
-              <ThemedText
-                type="small"
-                style={[styles.traitMark, { color: traitColors[trait.kind] }]}>
+              <ThemedText type="small" style={[styles.traitMark, { color: traitColors[trait.kind] }]}>
                 {trait.kind === 'strength' ? '✓' : trait.kind === 'gap' ? '!' : '·'}
               </ThemedText>
               <ThemedText type="small" style={styles.traitText}>
@@ -144,57 +166,66 @@ export function LearnerProfileCard({
               </ThemedText>
             </View>
           ))}
-        </ThemedView>
+          {profile.suggestion ? (
+            <View style={styles.traitRow}>
+              <ThemedText type="small" style={[styles.traitMark, { color: theme.accent }]}>
+                👉
+              </ThemedText>
+              <ThemedText type="small" themeColor="accent" style={styles.traitText}>
+                {profile.suggestion}
+              </ThemedText>
+            </View>
+          ) : null}
+        </View>
       ) : null}
 
-      {/* 4. 参考层(旧体系) */}
-      {!compact ? (
-        <ThemedView type="background" style={[styles.refCard, { borderColor: theme.border }]}>
+      {/* ── 阅读统计 / 话题 / 参考档位 ── */}
+      {reading ? (
+        <View style={[styles.block, styles.blockTop, divider, styles.footer]}>
           <ThemedText type="small" themeColor="textSecondary">
-            参考档位(仅作对照):{profile.bandLabel} · {profile.cefr}
+            累计阅读 {reading.totalWordsRead} 词
+            {reading.avgPerArticle != null ? ` · 篇均 ${reading.avgPerArticle} 词` : ''}
+            {' · '}已掌握 {reading.masteredCount} 词
           </ThemedText>
-          <ThemedText type="small" themeColor="accent" style={styles.suggestion}>
-            {profile.suggestion}
+          <ThemedText type="small" themeColor="textSecondary">
+            {reading.topics ? `常读话题:${reading.topics}` : '读完几篇后,这里会显示你偏好的话题'}
           </ThemedText>
-        </ThemedView>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.bandRef}>
+            参考档位:{profile.bandLabel}(仅作对照,推荐按预测理解率匹配)
+          </ThemedText>
+        </View>
       ) : null}
-    </View>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: Spacing.two + 2 },
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Spacing.three, padding: Spacing.three },
+  block: { gap: Spacing.two },
+  /** 段与段之间的分隔(细线 + 上间距) */
+  blockTop: { marginTop: Spacing.three, paddingTop: Spacing.three },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   vocabRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one + 2 },
   vocab: { fontSize: 44, lineHeight: 52 },
   unit: { paddingBottom: Spacing.one },
-  track: {
-    height: 10,
-    borderRadius: 999,
-    overflow: 'hidden',
-    marginTop: Spacing.one,
-  },
+  refChip: { marginLeft: Spacing.one },
+  refChipText: { fontSize: 12 },
+  track: { height: 10, borderRadius: 999, overflow: 'hidden', marginTop: Spacing.one },
   range: { position: 'absolute', top: 0, bottom: 0, borderRadius: 999 },
   point: { position: 'absolute', top: -3, width: 3, height: 16, borderRadius: 2 },
-  scaleRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  scaleText: { fontSize: 11, lineHeight: 14 },
 
   bandRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
-  bandLabel: { width: 96, fontSize: 12, lineHeight: 16 },
+  bandLabel: { width: 92, fontSize: 12, lineHeight: 16 },
   bandTrack: { flex: 1, height: 8, borderRadius: 999, overflow: 'hidden' },
   bandFill: { height: '100%', borderRadius: 999 },
-  bandPct: { width: 40, textAlign: 'right', fontSize: 12 },
-  bandCount: { width: 44, textAlign: 'right', fontSize: 11 },
+  bandPct: { width: 38, textAlign: 'right', fontSize: 12 },
+  bandCount: { width: 42, textAlign: 'right', fontSize: 11 },
 
   traitRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-start' },
-  traitMark: { width: 12, fontWeight: '700' },
+  traitMark: { width: 16, fontWeight: '700' },
   traitText: { flex: 1, lineHeight: 19 },
 
-  refCard: {
-    borderRadius: Spacing.three,
-    padding: Spacing.three,
-    gap: Spacing.one + 2,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  suggestion: { lineHeight: 19 },
+  footer: { gap: Spacing.one + 2 },
+  bandRef: { fontSize: 12, lineHeight: 16 },
+  pressed: { opacity: 0.6 },
 });
