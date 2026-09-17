@@ -1,7 +1,7 @@
 import Constants from 'expo-constants';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -73,6 +73,41 @@ export default function ProfileScreen() {
    * 开发环境下额外标注「开发版」,方便和 GitHub 上已发布的 Release 区分。
    */
   const appVersionText = `${String(Constants.expoConfig?.version ?? '未知')}${__DEV__ ? '(开发版)' : ''}`;
+
+  /**
+   * 隐藏开发者入口:在「关于 → 版本」上连点 5 次进入 /dev。
+   * 正式 APK 里没有开发者菜单(摇一摇只在 Expo Go 有效),而重测首次启动流程
+   * 必须能重置本机档案,所以入口藏在这里。2 秒内不继续点就清零,避免误触累积。
+   */
+  const [devTaps, setDevTaps] = useState(0);
+  const [devHint, setDevHint] = useState(false);
+  const devTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleVersionTap = () => {
+    const next = devTaps + 1;
+    if (next >= 5) {
+      setDevTaps(0);
+      setDevHint(false);
+      if (devTimerRef.current) clearTimeout(devTimerRef.current);
+      router.push('/dev');
+      return;
+    }
+    setDevTaps(next);
+    if (next >= 3) setDevHint(true);
+    if (devTimerRef.current) clearTimeout(devTimerRef.current);
+    devTimerRef.current = setTimeout(() => {
+      setDevTaps(0);
+      setDevHint(false);
+    }, 2000);
+  };
+
+  // 卸载时清掉计时器
+  useEffect(
+    () => () => {
+      if (devTimerRef.current) clearTimeout(devTimerRef.current);
+    },
+    [],
+  );
 
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [goal, setGoal] = useState<DailyGoal | null>(null);
@@ -408,7 +443,12 @@ export default function ProfileScreen() {
         {/* 关于 */}
         <SectionTitle text="关于" />
         <ThemedView type="backgroundElement" style={styles.list}>
-          <SettingRow label="版本" value={appVersionText} />
+          <SettingRow label="版本" value={appVersionText} onPress={handleVersionTap} />
+          {devHint ? (
+            <ThemedText type="small" themeColor="accent" style={styles.devHint}>
+              再点 {5 - devTaps} 次进入开发者选项
+            </ThemedText>
+          ) : null}
           <SettingRow label="词典与词频" sublabel="ECDICT(MIT License)" />
           <SettingRow label="每日语料" sublabel="Project Gutenberg 公版书籍(Public Domain)" />
           <SettingRow label="开源仓库" sublabel="github.com/Justin-Emils/Eng" last />
@@ -474,6 +514,8 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 15 },
   sectionTitle: { marginTop: Spacing.two, marginLeft: Spacing.one },
   list: { borderRadius: Spacing.three, paddingHorizontal: Spacing.three },
+  /** 连点版本号时的提示(凑够 5 次进开发者选项) */
+  devHint: { textAlign: 'right', paddingRight: Spacing.one, marginTop: -Spacing.one },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two, paddingBottom: Spacing.two },
   chip: {
     paddingHorizontal: Spacing.two + 2,
