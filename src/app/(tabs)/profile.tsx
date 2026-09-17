@@ -11,11 +11,11 @@ import { SettingRow } from '@/components/setting-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { getArticleById } from '@/data/articles';
+import { getAllArticles, getArticleById } from '@/data/articles';
 import { computeStats, type LearningStats } from '@/domain/analytics';
 import { wordsToCsv } from '@/domain/export';
-import { bandLabelOf } from '@/domain/levels';
-import { buildLearnerProfile, type LearnerProfile } from '@/domain/profile';
+import { bandLabelOf, DEFAULT_USER_VOCAB } from '@/domain/levels';
+import { buildLearnerProfile, bandRoi, type LearnerProfile } from '@/domain/profile';
 import { computeStreak } from '@/domain/stats';
 import { useDailyCorpus } from '@/hooks/use-daily-corpus';
 import { useAuth } from '@/hooks/use-auth';
@@ -165,14 +165,21 @@ export default function ProfileScreen() {
 
       setGoal(settings.dailyGoal);
       setUserLevel(level);
-      // 量化画像(词汇量 + 区间 + 分频段曲线 + 行为标签 + 派生建议)
+      /**
+       * 量化画像(词汇量 + 区间 + 分频段曲线 + 行为标签 + 派生建议)。
+       * ROI(补词的投入产出比)用**内置语料**统计:每日远程文章不参与,
+       * 否则同一条建议会随当天拉到什么文章而漂移。
+       */
       setProfile(
         buildLearnerProfile(level, {
-          streakDays: nextStats.streakDays,
-          wordCount: nextStats.wordCount,
-          masteredCount: nextStats.masteredCount,
-          totalArticlesCompleted: nextStats.totalArticlesCompleted,
-          totalWordsRead: nextStats.totalWordsRead,
+          behavior: {
+            streakDays: nextStats.streakDays,
+            wordCount: nextStats.wordCount,
+            masteredCount: nextStats.masteredCount,
+            totalArticlesCompleted: nextStats.totalArticlesCompleted,
+            totalWordsRead: nextStats.totalWordsRead,
+          },
+          roi: bandRoi(level.vocab ?? DEFAULT_USER_VOCAB, getAllArticles()),
         }),
       );
     };

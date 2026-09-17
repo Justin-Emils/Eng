@@ -15,9 +15,10 @@
  * 匹配时只作为兜底排序,不再作为主判据。
  */
 
-import { difficultyOf, coverageAt } from '@/domain/difficulty';
+import { difficultyOf, coverageAt, thresholdOfWord } from '@/domain/difficulty';
 import { bandLabelOf, cefrToVocab, vocabToCefr } from '@/domain/levels';
-import { bandLabel } from '@/domain/wordlevel';
+import { VOCAB_BANDS, bandLabel } from '@/domain/wordlevel';
+import { extractWords } from '@/domain/wordmark';
 import type { Article, CefrLevel, UserLevel } from '@/types';
 
 /** 学习区:目标预测理解率(生词率 4%–7%)。与 recommend.ts 的目标区间保持一致 */
@@ -141,12 +142,16 @@ function deriveTraits(
   bands: BandMastery[],
   accuracy: number,
   answers: number,
-): { traits: ProfileTrait[]; suggestion: string } {
+): { traits: ProfileTrait[]; suggestion: string; gapThreshold: number | null } {
   const traits: ProfileTrait[] = [];
 
   if (bands.length === 0) {
     traits.push({ kind: 'note', text: '还没有评估明细,做一次评估即可生成词汇曲线' });
-    return { traits, suggestion: '做一次评估(约 1 分钟),推荐会按你的实际词汇量精确匹配' };
+    return {
+      traits,
+      suggestion: '做一次评估(约 1 分钟),推荐会按你的实际词汇量精确匹配',
+      gapThreshold: null,
+    };
   }
 
   const easiest = bands[0];
@@ -200,7 +205,7 @@ function deriveTraits(
   }
 
   void easiest;
-  return { traits, suggestion };
+  return { traits, suggestion, gapThreshold: gapBand ? gapBand.threshold : null };
 }
 
 /**
@@ -213,6 +218,110 @@ export interface BehaviorInput {
   masteredCount: number;
   totalArticlesCompleted: number;
   totalWordsRead: number;
+}
+
+/**
+ * 某一档词在**真实语料**上的投入产出比 —— 用来回答"补哪一档最划算"。
+ *
+ * 为什么需要它:"缺口大就优先补"这个口径是错的。低档词通常更高频、
+ * 在文章里反复出现,学 1 个词能立刻在阅读中兑现,而且复现多更容易巩固;
+ * 高档词往往一个词只出现一两次,学起来贵得多。所以真正的判据是
+ * **每学 1 个词能多认识多少比例的文本**(gainPerWord),而不是缺口大小。
+ */
+export interface BandRoi {
+  threshold: number;
+  label: string;
+  /** 该档在语料里出现过的去重词数(只统计有门槛数据的词) */
+  uniqueWords: number;
+  /** 其中用户还不认识的去重词数 */
+  unknownUnique: number;
+  /** 学完这一档的未知词后,阅读覆盖率能提升多少(百分点) */
+  coverageGainPct: number;
+  /** 性价比:每学 1 个词带来的覆盖率提升(百分点/词) */
+  gainPerWord: number;
+  /** 未知词在语料中的平均复现次数(越高越容易巩固) */
+  avgRepetition: number;
+}
+
+/** 统计各档词的语料投入产出比(纯函数,词门槛结果内部缓存) */
+export function bandRoi(vocab: number, articles: readonly Article[]): BandRoi[] {
+  const bands = [...VOCAB_BANDS];
+  const perBand = new Map<number, { unique: Map<string, number>; unknown: Map<string, number> }>();
+  for (const band of bands) perBand.set(band, { unique: new Map(), unknown: new Map() });
+
+  const thresholdCache = new Map<string, number | null>();
+  let totalTokens = 0;
+
+  for (const article of articles) {
+    for (const raw of extractWords(article.paragraphs.join(' '))) {
+      const word = raw.toLowerCase();
+      let threshold = thresholdCache.get(word);
+      if (threshold === undefined) {
+        threshold = thresholdOfWord(word);
+        thresholdCache.set(word, threshold);
+      }
+      if (threshold == null) continue;
+      totalTokens += 1;
+      // 门槛落进哪一档:取第一个"不低于它"的档位,超出全部档位则归入最高档
+      const band = bands.find((b) => threshold <= b) ?? bands[bands.length - 1];
+      const entry = perBand.get(band)!;
+      entry.unique.set(word, (entry.unique.get(word) ?? 0) + 1);
+      if (threshold > vocab) entry.unknown.set(word, (entry.unknown.get(word) ?? 0) + 1);
+    }
+  }
+
+  return bands.map((band) => {
+    const entry = perBand.get(band)!;
+    const unknownTokens = [...entry.unknown.values()].reduce((sum, n) => sum + n, 0);
+    const unknownUnique = entry.unknown.size;
+    const coverageGainPct = totalTokens > 0 ? (unknownTokens / totalTokens) * 100 : 0;
+    return {
+      threshold: band,
+      label: bandLabel(band),
+      uniqueWords: entry.unique.size,
+      unknownUnique,
+      coverageGainPct,
+      gainPerWord: unknownUnique > 0 ? coverageGainPct / unknownUnique : 0,
+      avgRepetition: unknownUnique > 0 ? unknownTokens / unknownUnique : 0,
+    };
+  });
+}
+
+/** 由 ROI 数据生成建议:优先性价比最高的档位,并说明与"缺口最大档"的取舍 */
+function roiSuggestion(roi: BandRoi[], gapThreshold: number | null): { advice: string; trait: ProfileTrait | null } | null {
+  // 样本太小的档位不参与比较(3 个词算出的性价比没有意义)
+  const candidates = roi.filter((r) => r.unknownUnique >= 15);
+  if (candidates.length === 0) return null;
+
+  const best = candidates.reduce((a, b) => (b.gainPerWord > a.gainPerWord ? b : a));
+  const gapRoi = gapThreshold != null ? candidates.find((r) => r.threshold === gapThreshold) : undefined;
+  const perWord = best.gainPerWord.toFixed(3);
+
+  if (gapRoi && gapRoi.threshold === best.threshold) {
+    return {
+      advice: `优先补 ${best.label}:缺口最大且性价比最高(每学 1 个词约多认识 ${perWord}% 文本)`,
+      trait: null,
+    };
+  }
+
+  const ratio = gapRoi && gapRoi.gainPerWord > 0 ? best.gainPerWord / gapRoi.gainPerWord : 0;
+  const gapPart =
+    gapRoi && ratio > 1.3
+      ? `${gapRoi.label} 缺口更大,但每个词贵约 ${ratio.toFixed(1)} 倍(语料里平均只出现 ${gapRoi.avgRepetition.toFixed(1)} 次),备考要补,建议排在后面`
+      : gapRoi
+        ? `${gapRoi.label} 缺口也值得补,两者性价比接近`
+        : '';
+
+  return {
+    advice: `先补 ${best.label}(性价比最高:每学 1 个词约多认识 ${perWord}% 文本,这些词在语料里平均复现 ${best.avgRepetition.toFixed(1)} 次)。${gapPart}`,
+    trait:
+      gapRoi && ratio > 1.3
+        ? {
+            kind: 'note',
+            text: `补词顺序按性价比算:${best.label} 的词平均复现 ${best.avgRepetition.toFixed(1)} 次,${gapRoi.label} 只有 ${gapRoi.avgRepetition.toFixed(1)} 次 —— 同样学 100 个词,前者在阅读里兑现得快得多`,
+          }
+        : null,
+  };
 }
 
 /** 由行为数据派生标签与建议(与词汇曲线互补) */
@@ -255,13 +364,22 @@ function behaviorTraits(behavior: BehaviorInput): { traits: ProfileTrait[]; advi
   return { traits, advice };
 }
 
+/** buildLearnerProfile 的可选输入 */
+export interface ProfileOptions {
+  /** 本机学习行为(打卡、生词积压等) */
+  behavior?: BehaviorInput;
+  /** 语料投入产出比(见 bandRoi);给了才会按"性价比"而不是"缺口大小"给建议 */
+  roi?: BandRoi[];
+}
+
 /**
- * 生成量化画像。纯函数:输入持久化的 UserLevel(+ 可选行为数据),输出可直接渲染的画像。
- * 没有评估数据时(vocab 缺失)按 CEFR 代表词汇量兜底,并标注 mode='pick' 使区间更宽。
+ * 生成量化画像。纯函数:输入持久化的 UserLevel(+ 可选行为数据与语料 ROI),
+ * 输出可直接渲染的画像。没有评估数据时(vocab 缺失)按 CEFR 代表词汇量兜底,
+ * 并标注 mode='pick' 使区间更宽。
  */
 export function buildLearnerProfile(
   level: UserLevel,
-  behavior?: BehaviorInput,
+  options: ProfileOptions = {},
 ): LearnerProfile {
   const vocab = Math.round(level.vocab ?? cefrToVocab(level.level));
   const rounds = level.rounds ?? [];
@@ -274,11 +392,24 @@ export function buildLearnerProfile(
 
   const margin = estimateMargin({ vocab, answers, accuracy, mode, rounds });
   const bands = bandsFromRounds(rounds);
-  const { traits: vocabTraits, suggestion: vocabAdvice } = deriveTraits(bands, accuracy, answers);
+  const {
+    traits: vocabTraits,
+    suggestion: vocabAdvice,
+    gapThreshold,
+  } = deriveTraits(bands, accuracy, answers);
 
-  const behaviorResult = behavior ? behaviorTraits(behavior) : { traits: [], advice: null };
-  // 行为建议优先于词汇建议:积压复习是"今天就能动手"的事,比"补哪一档词"更紧迫
-  const suggestion = behaviorResult.advice ?? vocabAdvice;
+  const behaviorResult = options.behavior ? behaviorTraits(options.behavior) : { traits: [], advice: null };
+  // 有语料数据时,用"投入产出比"取代"缺口最大"作为补词建议的口径
+  const roiResult =
+    options.roi && options.roi.length > 0 ? roiSuggestion(options.roi, gapThreshold) : null;
+
+  // 建议优先级:先清复习积压(今天就能动手)> 补词性价比(投入产出比)> 词汇曲线兜底
+  const suggestion = behaviorResult.advice ?? roiResult?.advice ?? vocabAdvice;
+  const traits = [
+    ...behaviorResult.traits,
+    ...(roiResult?.trait ? [roiResult.trait] : []),
+    ...vocabTraits,
+  ];
 
   const confidence: LearnerProfile['confidence'] =
     answers >= 30 ? '高' : answers >= 15 ? '中' : '低';
@@ -295,7 +426,7 @@ export function buildLearnerProfile(
     cefr: vocabToCefr(vocab),
     bandLabel: bandLabelOf(vocab),
     bands,
-    traits: [...behaviorResult.traits, ...vocabTraits],
+    traits,
     suggestion,
   };
 }

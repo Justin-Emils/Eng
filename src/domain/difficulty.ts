@@ -180,6 +180,16 @@ function hasThresholdData(word: string): boolean {
 }
 
 /**
+ * 公开的"词 → 认识它所需词汇量"入口(全站同一标尺,供语料统计/投入产出比使用)。
+ * 无任何数据时返回 null,而不是返回上限值 —— 调用方需要能区分
+ * "这个词很难" 与 "词典里没有这个词"。
+ */
+export function thresholdOfWord(word: string): number | null {
+  if (!hasThresholdData(word)) return null;
+  return thresholdOf(word);
+}
+
+/**
  * 统计一篇文章对某词汇量的"可学词"与"噪音词"。
  * 与生词率不同:生词率只看"不认识多少",这里进一步区分**认了值不值得**——
  * 同为 5% 生词率,一篇文章的新词集中在 +500 档,另一篇全在 +4000 档,价值完全不同。

@@ -258,3 +258,53 @@ const fit = profileMod.corpusFit(userVocab, articles);
 console.log(`\n  语料适配(基于 ${fit.sampleSize} 篇实测):`);
 console.log(`    舒适阅读上限:所需词汇量 ≤ ${fit.comfortCeiling} 词的文章,预测理解率 ≥ 96%`);
 console.log(`    学习区(93%–96%):所需词汇量 ${fit.zoneFrom}–${fit.zoneTo} 词`);
+
+console.log(`\n================ 5. 补词顺序:缺口大小 vs 性价比(用户 ${userVocab} 词) ================`);
+const roi = profileMod.bandRoi(userVocab, articles);
+console.log('  档位            未知去重词  学完可提升覆盖率   每词收益      平均复现');
+for (const r of roi) {
+  console.log(
+    `    ${r.label.padEnd(14)} ${String(r.unknownUnique).padStart(5)} 个 ${r.coverageGainPct.toFixed(2).padStart(9)}% ${r.gainPerWord.toFixed(3).padStart(10)}%/词 ${r.avgRepetition.toFixed(1).padStart(8)} 次`,
+  );
+}
+
+const candidates = roi.filter((r) => r.unknownUnique >= 15);
+if (candidates.length > 0) {
+  const best = candidates.reduce((a, b) => (b.gainPerWord > a.gainPerWord ? b : a));
+  console.log(`\n  → 性价比最高:${best.label}(每学 1 个词约多认识 ${best.gainPerWord.toFixed(3)}% 文本)`);
+
+  // 模拟"评估曲线显示 5500 档断层"的典型用户,对比两种口径给出的建议
+  const level = {
+    vocab: userVocab,
+    level: 'B2',
+    assessed: true,
+    updatedAt: 0,
+    mode: 'quick',
+    rounds: [
+      { threshold: 1500, total: 5, known: 5 },
+      { threshold: 3000, total: 5, known: 5 },
+      { threshold: 4200, total: 5, known: 4 },
+      { threshold: 5500, total: 5, known: 1 },
+    ],
+    answers: 20,
+    knownAnswers: 15,
+  };
+  const naive = profileMod.buildLearnerProfile(level);
+  const withRoi = profileMod.buildLearnerProfile(level, { roi });
+
+  const gapRoi = roi.find((r) => r.threshold === 5500);
+  console.log('\n  同一个用户(曲线显示 5500 档只有 20%):');
+  if (gapRoi) {
+    console.log(
+      `    5500 档:未知 ${gapRoi.unknownUnique} 个 · 每词收益 ${gapRoi.gainPerWord.toFixed(3)}% · 平均复现 ${gapRoi.avgRepetition.toFixed(1)} 次`,
+    );
+    if (gapRoi.gainPerWord > 0) {
+      console.log(`    性价比差距:${best.label} 每词收益是它的 ${(best.gainPerWord / gapRoi.gainPerWord).toFixed(1)} 倍`);
+    }
+  }
+  console.log(`\n    [旧口径 · 只看缺口] ${naive.suggestion}`);
+  console.log(`    [新口径 · 算性价比] ${withRoi.suggestion}`);
+  for (const t of withRoi.traits) {
+    if (t.kind === 'note') console.log(`      note: ${t.text}`);
+  }
+}
