@@ -24,7 +24,13 @@ import {
   getCheckinDateKeys,
   todayKey,
 } from '@/storage/checkins';
-import { getAccount, joinedDays, saveAccount, type AccountInfo } from '@/storage/account';
+import {
+  DEFAULT_AVATAR,
+  getAccount,
+  joinedDays,
+  saveAccount,
+  type AccountInfo,
+} from '@/storage/account';
 import { getSettings, saveDailyGoal, type DailyGoal } from '@/storage/settings';
 import { getUserLevel } from '@/storage/user';
 import { clearWords, getWords } from '@/storage/words';
@@ -183,7 +189,7 @@ export default function ProfileScreen() {
         <ThemedView type="backgroundElement" style={styles.card}>
           <View style={styles.personRow}>
             <Pressable onPress={() => router.push('/account')} hitSlop={6}>
-              <Avatar emoji={account?.avatar ?? '📚'} size={56} />
+              <Avatar source={account?.avatar ?? DEFAULT_AVATAR} size={56} />
             </Pressable>
             <View style={styles.personBody}>
               <View style={styles.nickRow}>
