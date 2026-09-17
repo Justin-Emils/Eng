@@ -63,6 +63,10 @@ cd android
   - 修 bug / 打磨 UI → PATCH(`v1.0.13`)
   - 新增功能(如云同步、账号体系) → MINOR(`v1.1.0`)
   - 数据结构不兼容(备份格式、存储键重构) → MAJOR(`v2.0.0`)
+- **发版时必须同步改三处**,否则「关于」里显示的是假版本(曾经 tag 发到 v1.0.12、App 里还写着 1.0.0):
+  1. `app.json` 的 `version`
+  2. `app.json` 的 `android.versionCode`(每次发版 +1,否则新 APK 装不上旧版之上)
+  3. 重新 `npx expo prebuild --platform android` 让 `android/` 里的 versionName / versionCode 跟着更新
 - Release 说明只写"这一版相比上一版新增/修了什么",不累积历史。
 
 > GitHub 上只保留两个版本:`v1.0.0`(起点)与最新一个;中间过程版本不长期留存。

@@ -28,7 +28,6 @@ import {
 import {
   DEFAULT_AVATAR,
   getAccount,
-  joinedDays,
   saveAccount,
   type AccountInfo,
 } from '@/storage/account';
@@ -66,6 +65,14 @@ export default function ProfileScreen() {
   const themeMode = useThemeMode();
   const daily = useDailyCorpus();
   const auth = useAuth();
+  const signedIn = auth.status === 'authed';
+
+  /**
+   * 版本号取自 app.json 的 version —— 发版时必须同步递增,否则「关于」里显示的是假版本
+   * (之前正是这个原因:tag 一路发到 v1.0.12,而这里一直显示 1.0.0)。
+   * 开发环境下额外标注「开发版」,方便和 GitHub 上已发布的 Release 区分。
+   */
+  const appVersionText = `${String(Constants.expoConfig?.version ?? '未知')}${__DEV__ ? '(开发版)' : ''}`;
 
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [goal, setGoal] = useState<DailyGoal | null>(null);
@@ -187,7 +194,9 @@ export default function ProfileScreen() {
           我的
         </ThemedText>
 
-        {/* 个人卡:头像 / 昵称 / 水平 / 关键数据;点头像进账号页 */}
+        {/* 个人卡:头像 / 昵称 / 水平 / 关键数据。
+            未登录时必须明说是「本机档案」并把入口写成「登录」——
+            之前无论登不登录都显示「账号 ›」和「加入 N 天」,看起来像已经有账号了。 */}
         <ThemedView type="backgroundElement" style={styles.card}>
           <View style={styles.personRow}>
             <Pressable onPress={() => router.push('/account')} hitSlop={6}>
@@ -207,14 +216,16 @@ export default function ProfileScreen() {
                   returnKeyType="done"
                 />
                 <Pressable onPress={() => router.push('/account')} hitSlop={6}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    账号 ›
+                  <ThemedText type="small" themeColor="accent">
+                    {signedIn ? '账号 ›' : '登录 ›'}
                   </ThemedText>
                 </Pressable>
               </View>
               <ThemedText type="small" themeColor="textSecondary">
                 {levelText}
-                {account ? ` · 加入 ${joinedDays(account)} 天` : ''}
+                {signedIn
+                  ? ` · 已登录 ${auth.session?.user.email ?? ''}`
+                  : ' · 本机档案(未登录)'}
               </ThemedText>
             </View>
           </View>
@@ -397,7 +408,7 @@ export default function ProfileScreen() {
         {/* 关于 */}
         <SectionTitle text="关于" />
         <ThemedView type="backgroundElement" style={styles.list}>
-          <SettingRow label="版本" value={String(Constants.expoConfig?.version ?? '1.0.0')} />
+          <SettingRow label="版本" value={appVersionText} />
           <SettingRow label="词典与词频" sublabel="ECDICT(MIT License)" />
           <SettingRow label="每日语料" sublabel="Project Gutenberg 公版书籍(Public Domain)" />
           <SettingRow label="开源仓库" sublabel="github.com/Justin-Emils/Eng" last />

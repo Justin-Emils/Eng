@@ -254,7 +254,9 @@ export default function AccountScreen() {
                 {account?.nickname || '未设置昵称'}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
-                本地账号 · 加入 {account ? joinedDays(account) : '–'} 天
+                {auth.status === 'authed'
+                  ? `已登录云端账号 · 加入 ${account ? joinedDays(account) : '–'} 天`
+                  : `本机档案(未登录) · 加入 ${account ? joinedDays(account) : '–'} 天`}
               </ThemedText>
               <Pressable onPress={() => void handleCopyId()} hitSlop={6}>
                 <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
