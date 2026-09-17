@@ -16,6 +16,7 @@ import { wordsToCsv } from '@/domain/export';
 import { bandLabelOf } from '@/domain/levels';
 import { computeStreak } from '@/domain/stats';
 import { useDailyCorpus } from '@/hooks/use-daily-corpus';
+import { useAuth } from '@/hooks/use-auth';
 import { useTheme } from '@/hooks/use-theme';
 import { setThemeMode, useThemeMode, type ThemeMode } from '@/hooks/use-theme-mode';
 import {
@@ -64,6 +65,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const themeMode = useThemeMode();
   const daily = useDailyCorpus();
+  const auth = useAuth();
 
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [goal, setGoal] = useState<DailyGoal | null>(null);
@@ -369,8 +371,12 @@ export default function ProfileScreen() {
         <ThemedView type="backgroundElement" style={styles.list}>
           <SettingRow
             label="账号与同步"
-            sublabel="当前为本地账号,数据仅存本机;云同步(注册/登录)开发中"
-            value="本地 ›"
+            sublabel={
+              auth.status === 'authed'
+                ? `已登录 ${auth.session?.user.email ?? ''} · 可上传 / 恢复学习数据`
+                : '当前为本地账号,数据仅存本机;登录后可同步到云端'
+            }
+            value={auth.status === 'authed' ? '已登录 ›' : '去登录 ›'}
             onPress={() => router.push('/account')}
             last
           />

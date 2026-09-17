@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { Colors } from '@/constants/theme';
 import { hydrateRemoteArticles } from '@/data/articles/remote-registry';
+import { hydrateAuth } from '@/domain/auth/store';
 import { ensureDailyCorpusUpdate } from '@/domain/corpus/update';
 import { useResolvedScheme } from '@/hooks/use-theme';
 import { hydrateThemeMode } from '@/hooks/use-theme-mode';
@@ -40,6 +41,8 @@ export default function RootLayout() {
       const settings = await getSettings();
       setNeedsOnboarding(!settings.onboarded);
       setBootChecked(true);
+      // 恢复上次的登录态(token 过期会自动续期;失败静默退回未登录)
+      await hydrateAuth();
       // 启动:水化远程文章;今天未更新则自动拉取一批公版短文(失败静默,下次再试)
       await hydrateRemoteArticles();
       await ensureDailyCorpusUpdate();
