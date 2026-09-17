@@ -2,12 +2,12 @@
  * 忘记密码 / 修改密码。
  *
  * 两种模式共用一个页面:
- * - 默认(忘记密码):输邮箱 → 收 6 位验证码 → 验证码 + 新密码 → 直接重置并登录;
+ * - 默认(忘记密码):输邮箱 → 收验证码 → 验证码 + 新密码 → 直接重置并登录;
  * - `?mode=change`(已登录时改密码):跳过邮箱环节,直接设新密码。
  *
  * 为什么用验证码而不是邮件里的重置链接:链接方式要在 Supabase 配回调地址、
  * 还要在 Android 上注册深链,任何一环没配好就是"点了没反应"。
- * 验证码只需要用户手输 6 位数字,没有可失效的中间环节。
+ * 验证码只需要用户照着邮件输一串数字,没有可失效的中间环节。
  */
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -180,7 +180,7 @@ export default function ForgotPasswordScreen() {
     return (
       <AuthShell
         title="忘记密码"
-        subtitle="输入注册用的邮箱,我们会发一封含 6 位验证码的邮件给你,用它可以重设密码。"
+        subtitle="输入注册用的邮箱,我们会发一封含验证码的邮件给你,用它可以重设密码。"
         footer={
           <ThemedText type="small" themeColor="textSecondary">
             想起密码了?<ThemedText type="small" themeColor="accent" onPress={goBack}>去登录</ThemedText>
@@ -214,10 +214,11 @@ export default function ForgotPasswordScreen() {
         label="邮箱验证码"
         value={code}
         onChangeText={setCode}
-        placeholder="邮件里的 6 位数字"
+        placeholder="照邮件里的原样输入"
         keyboardType="number-pad"
         returnKeyType="next"
-        maxLength={6}
+        maxLength={10}
+        hint="就是邮件里那串数字,不用加空格或横线。"
         error={errors.code}
         editable={!busy}
       />

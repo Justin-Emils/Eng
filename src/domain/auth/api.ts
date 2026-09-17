@@ -219,7 +219,7 @@ export async function updatePassword(token: string, password: string): Promise<v
   await request('/user', { method: 'PUT', token, body: { password } });
 }
 
-/** 忘记密码第一步:向邮箱发送 6 位验证码(需后端邮件模板包含 {{ .Token }}) */
+/** 忘记密码第一步:向邮箱发送验证码(需后端邮件模板包含 {{ .Token }}) */
 export async function sendRecoveryEmail(email: string): Promise<void> {
   await request('/recover', { body: { email } });
 }

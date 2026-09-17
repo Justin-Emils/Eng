@@ -35,10 +35,17 @@ export function validateNickname(value: string): string | null {
   return null;
 }
 
-/** 邮箱验证码:后端发的是 6 位数字 */
+/**
+ * 邮箱验证码。
+ *
+ * 位数**不写死**:Supabase 的 OTP 长度是后端可配的(常见 6 位,新项目实测 8 位),
+ * 之前按 6 位校验导致 8 位验证码被判"格式错误",这里只做"是否纯数字 + 长度合理"的判断,
+ * 真正的对错由后端比对。
+ */
 export function validateCode(value: string): string | null {
   const v = value.trim();
   if (!v) return '请输入邮箱里的验证码';
-  if (!/^\d{6}$/.test(v)) return '验证码是 6 位数字';
+  if (!/^\d+$/.test(v)) return '验证码只包含数字';
+  if (v.length < 6 || v.length > 10) return '验证码位数不对,请照邮件里的原样输入';
   return null;
 }
