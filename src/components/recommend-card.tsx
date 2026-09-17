@@ -16,22 +16,24 @@ import type { Article } from '@/types';
 
 export interface RecommendCardData {
   article: Article;
-  /** 难度档(如 B1+) */
+  /** 参考档位(如 B1+)—— 只作参考层展示 */
   bandId: string;
   /** 所需词汇量 */
   requiredVocab: number;
-  /** 生词比例(0–1) */
-  unknownRate: number;
-  /** 一句人话评价:刚好合适 / 略有挑战 … */
+  /** 预测理解率(0–1):你大约能认识这篇多少比例的词 */
+  coverage: number;
+  /** 一句人话评价:刚好合适 / 略有挑战 …(按理解率判定) */
   fit: string;
+  /** 值得学的去重新词数 */
+  learnableCount: number;
   /** 新词示例 */
   sampleNewWords: string[];
 }
 
 export function RecommendCard({ data }: { data: RecommendCardData }) {
   const router = useRouter();
-  const { article, bandId, requiredVocab, unknownRate, fit, sampleNewWords } = data;
-  const rateText = `${(unknownRate * 100).toFixed(1)}%`;
+  const { article, bandId, requiredVocab, coverage, fit, learnableCount, sampleNewWords } = data;
+  const coverageText = `${(coverage * 100).toFixed(1)}%`;
   const samples = sampleNewWords.slice(0, 2).join(' / ');
   const isStretch = fit === '略有挑战' || fit === '刚好合适';
 
@@ -47,8 +49,8 @@ export function RecommendCard({ data }: { data: RecommendCardData }) {
             {article.title}
           </ThemedText>
           <View style={styles.chips}>
-            <Chip text={`${bandId} · 约 ${requiredVocab} 词`} />
-            <Chip text={`生词 ${rateText}`} />
+            <Chip text={`认识约 ${coverageText}`} />
+            <Chip text={`新词 ${learnableCount}`} />
             <Chip text={`${article.difficulty.minutes} 分钟`} />
           </View>
           <ThemedText
@@ -56,7 +58,7 @@ export function RecommendCard({ data }: { data: RecommendCardData }) {
             themeColor={isStretch ? 'accent' : 'textSecondary'}
             numberOfLines={1}
             style={styles.reason}>
-            {isStretch ? '✓' : '💡'} {fit}
+            {isStretch ? '✓' : '💡'} {fit} · {bandId} 约 {requiredVocab} 词
             {samples ? ` · 新词 ${samples}` : ''}
           </ThemedText>
         </View>

@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { LearnerProfileCard } from '@/components/learner-profile-card';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   WORDS_PER_ROUND,
@@ -17,12 +18,19 @@ import {
   type AssessEstimate,
   type AssessWord,
 } from '@/domain/assessment';
+import { buildLearnerProfile } from '@/domain/profile';
 import { VOCAB_BANDS, bandLabel } from '@/domain/wordlevel';
 import { vocabToCefr } from '@/domain/levels';
 import { useTheme } from '@/hooks/use-theme';
 import { saveUserLevel } from '@/storage/user';
 
 type Mode = 'intro' | 'testing' | 'pick' | 'result';
+
+/** 评估模式:快评约 15 词(3 轮),精细约 40 词(最多 8 轮,区间更窄) */
+type Plan = 'quick' | 'fine';
+const MAX_ROUNDS: Record<Plan, number> = { quick: 4, fine: 8 };
+/** 精细评估至少答满这么多轮才收(否则"收敛"只用了 10 个词,区间不会变窄) */
+const MIN_ROUNDS_FINE = 4;
 
 /** 每词一次作答记录 */
 interface Answer {
@@ -46,6 +54,9 @@ export default function AssessmentScreen() {
   const [mode, setMode] = useState<Mode>('intro');
   const [pickedLevel, setPickedLevel] = useState<number | null>(null);
   const [result, setResult] = useState<AssessEstimate | null>(null);
+  const [plan, setPlan] = useState<Plan>('quick');
+  /** 收尾时的全部轮次,用于生成量化画像(区间 + 分频段曲线) */
+  const [finalRounds, setFinalRounds] = useState<BandResult[]>([]);
 
   // --- 自适应测试状态 ---
   const [currentBand, setCurrentBand] = useState<number>(START_BAND);
@@ -57,12 +68,14 @@ export default function AssessmentScreen() {
 
   const [assessmentError, setAssessmentError] = useState<string | null>(null);
 
-  const maxRounds = 4;
+  const maxRounds = MAX_ROUNDS[plan];
 
-  const startTest = () => {
+  const startTest = (nextPlan: Plan) => {
     const firstWords = sampleAssessmentWords(START_BAND, WORDS_PER_ROUND);
     setAssessmentError(null);
     setResult(null);
+    setFinalRounds([]);
+    setPlan(nextPlan);
     if (firstWords.length === 0) {
       setRoundWords([]);
       setRoundAnswers([]);
@@ -85,6 +98,7 @@ export default function AssessmentScreen() {
     const est = estimateFromRounds(completedRounds);
     if (!est) return false;
     setResult(est);
+    setFinalRounds(completedRounds);
     setMode('result');
     return true;
   };
@@ -104,7 +118,16 @@ export default function AssessmentScreen() {
       const newRounds = [...rounds, bandResult];
       const step = decideBandStep(bandResult);
       const nextIdx = roundIndex + 1;
-      if (step === 'settle' || nextIdx >= maxRounds) {
+      /**
+       * 收尾条件:
+       * - 答满轮数上限 → 收;
+       * - 快评:一旦收敛(相邻档之间)立刻收;
+       * - 精细:收敛后还要在**同一档再做一轮确认**,且总轮数不少于 MIN_ROUNDS_FINE,
+       *   否则 10 个词算出的区间和快评一样宽,白白多答。
+       */
+      const settledEnough =
+        step === 'settle' && (plan === 'quick' || newRounds.length >= MIN_ROUNDS_FINE);
+      if (settledEnough || nextIdx >= maxRounds) {
         finishAssessment(newRounds);
         return;
       }
@@ -113,7 +136,8 @@ export default function AssessmentScreen() {
           ? nextBand(currentBand, 'up')
           : step === 'down'
             ? nextBand(currentBand, 'down')
-            : null;
+            : // 收敛但轮数还不够 → 留在本档继续确认
+              currentBand;
       if (next == null) {
         finishAssessment(newRounds);
         return;
@@ -152,7 +176,17 @@ export default function AssessmentScreen() {
 
   const saveAndLeave = async () => {
     if (!result) return;
-    await saveUserLevel({ vocab: result.vocab, level: result.level, assessed: true, updatedAt: Date.now() });
+    // 把评估明细一起落盘:量化画像(置信区间 + 分频段曲线)靠它还原
+    await saveUserLevel({
+      vocab: result.vocab,
+      level: result.level,
+      assessed: true,
+      updatedAt: Date.now(),
+      rounds: finalRounds.length > 0 ? finalRounds : undefined,
+      answers: result.totalWords > 0 ? result.totalWords : undefined,
+      knownAnswers: result.totalWords > 0 ? result.knownWords : undefined,
+      mode: result.totalWords > 0 ? plan : 'quick',
+    });
     if (from === 'profile') {
       router.back();
     } else {
@@ -167,6 +201,25 @@ export default function AssessmentScreen() {
         ? `第 ${answeredInRound + 1} 词 · ${bandLabel(currentBand)}(${currentBand} 词量)`
         : '判定中…'
       : '';
+
+  /**
+   * 预览画像:用刚答完的明细直接算,口径与保存后「我的」页完全一致
+   * (同一个 buildLearnerProfile),避免结果页与存储值出现两套数字。
+   * updatedAt 传 0:画像计算不用它,而渲染期间不能调用 Date.now(不纯函数)。
+   */
+  const previewProfile = result
+    ? buildLearnerProfile({
+        vocab: result.vocab,
+        level: result.level,
+        assessed: true,
+        updatedAt: 0,
+        rounds: finalRounds.length > 0 ? finalRounds : undefined,
+        answers: result.totalWords > 0 ? result.totalWords : undefined,
+        knownAnswers: result.totalWords > 0 ? result.knownWords : undefined,
+        // 自选档位时不给 mode,由 buildLearnerProfile 推断为 'pick'(区间更宽)
+        mode: result.totalWords > 0 ? plan : undefined,
+      })
+    : null;
 
   return (
     <ThemedView style={styles.flex}>
@@ -206,13 +259,21 @@ export default function AssessmentScreen() {
                 </ThemedText>
               </ThemedView>
             ) : null}
-            <Pressable onPress={startTest} style={({ pressed }) => pressed && styles.pressed}>
+            <Pressable onPress={() => startTest('quick')} style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundSelected" style={styles.actionBtn}>
                 <ThemedText type="smallBold" themeColor="accent">
-                  开始自适应测试
+                  快速评估(约 15 词)
                 </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  每个词选「认识 / 不认识」即可
+                  每个词选「认识 / 不认识」即可,1 分钟
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
+            <Pressable onPress={() => startTest('fine')} style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type="backgroundElement" style={styles.actionBtn}>
+                <ThemedText type="smallBold">精细评估(约 40 词)</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  多答几轮,词汇量区间更窄、画像更准(约 3 分钟)
                 </ThemedText>
               </ThemedView>
             </Pressable>
@@ -220,7 +281,7 @@ export default function AssessmentScreen() {
               <ThemedView type="backgroundElement" style={styles.actionBtn}>
                 <ThemedText type="smallBold">直接自选水平</ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
-                  按考试目标档位手动选
+                  按考试目标档位手动选(区间会更宽)
                 </ThemedText>
               </ThemedView>
             </Pressable>
@@ -317,25 +378,13 @@ export default function AssessmentScreen() {
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + Spacing.six }]}>
           <View style={styles.section}>
             <ThemedText type="subtitle" style={styles.title}>
-              你的词汇量评估结果
+              你的词汇量画像
             </ThemedText>
-            <ThemedView type="backgroundElement" style={[styles.resultCard, { borderColor: theme.border }]}>
-              <ThemedText type="small" themeColor="textSecondary">估计词汇量</ThemedText>
-              <ThemedText type="title" themeColor="accent" style={styles.vocab}>
-                {result.vocab}
-              </ThemedText>
-              <ThemedText type="smallBold">
-                {bandLabel(result.finalThreshold)} · 约 {result.finalThreshold} 词档
-              </ThemedText>
-              {result.totalWords > 0 ? (
-                <ThemedText type="small" themeColor="textSecondary">
-                  测试 {result.knownWords}/{result.totalWords} 认识
-                </ThemedText>
-              ) : null}
-              <ThemedText type="small" themeColor="textSecondary" style={styles.paragraph}>
-                保存后,正文会按此词汇量标蓝生词,并按生词密度推荐文章。
-              </ThemedText>
-            </ThemedView>
+            {previewProfile ? <LearnerProfileCard profile={previewProfile} /> : null}
+            <ThemedText type="small" themeColor="textSecondary" style={styles.paragraph}>
+              保存后,正文会按这个词汇量标蓝生词,推荐会按「预测理解率」匹配 ——
+              目标区间是学习区(预计认识 93%–96% 的词)。
+            </ThemedText>
             <Pressable onPress={() => void saveAndLeave()} style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundSelected" style={styles.actionBtn}>
                 <ThemedText type="smallBold" themeColor="accent">
@@ -343,7 +392,9 @@ export default function AssessmentScreen() {
                 </ThemedText>
               </ThemedView>
             </Pressable>
-            <Pressable onPress={startTest} style={({ pressed }) => pressed && styles.pressed}>
+            <Pressable
+              onPress={() => startTest(plan)}
+              style={({ pressed }) => pressed && styles.pressed}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.retry}>
                 重新测试
               </ThemedText>

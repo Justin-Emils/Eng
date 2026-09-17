@@ -6,6 +6,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
+import { LearnerProfileCard } from '@/components/learner-profile-card';
 import { SettingRow } from '@/components/setting-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,6 +15,7 @@ import { getArticleById } from '@/data/articles';
 import { computeStats, type LearningStats } from '@/domain/analytics';
 import { wordsToCsv } from '@/domain/export';
 import { bandLabelOf } from '@/domain/levels';
+import { buildLearnerProfile, type LearnerProfile } from '@/domain/profile';
 import { computeStreak } from '@/domain/stats';
 import { useDailyCorpus } from '@/hooks/use-daily-corpus';
 import { useAuth } from '@/hooks/use-auth';
@@ -117,6 +119,8 @@ export default function ProfileScreen() {
   const [account, setAccount] = useState<AccountInfo | null>(null);
   /** 常读话题(按已读文章统计,取前 3) */
   const [topTopics, setTopTopics] = useState<{ tag: string; count: number }[]>([]);
+  /** 量化画像(由 domain/profile 从 UserLevel 算出) */
+  const [profile, setProfile] = useState<LearnerProfile | null>(null);
 
   const refresh = useCallback(() => {
     let active = true;
@@ -131,14 +135,13 @@ export default function ProfileScreen() {
       ]);
       if (!active) return;
       const readArticles = resolveArticles([...allChecked]);
-      setStats(
-        computeStats({
-          todayArticles: resolveArticles(todayIds),
-          allReadArticles: readArticles,
-          words,
-          streakDays: computeStreak(dateKeys, todayKey()),
-        }),
-      );
+      const nextStats = computeStats({
+        todayArticles: resolveArticles(todayIds),
+        allReadArticles: readArticles,
+        words,
+        streakDays: computeStreak(dateKeys, todayKey()),
+      });
+      setStats(nextStats);
 
       // 常读话题统计
       const counter = new Map<string, number>();
@@ -162,6 +165,16 @@ export default function ProfileScreen() {
 
       setGoal(settings.dailyGoal);
       setUserLevel(level);
+      // 量化画像(词汇量 + 区间 + 分频段曲线 + 行为标签 + 派生建议)
+      setProfile(
+        buildLearnerProfile(level, {
+          streakDays: nextStats.streakDays,
+          wordCount: nextStats.wordCount,
+          masteredCount: nextStats.masteredCount,
+          totalArticlesCompleted: nextStats.totalArticlesCompleted,
+          totalWordsRead: nextStats.totalWordsRead,
+        }),
+      );
     };
     load().catch(() => {});
     return () => {
@@ -272,8 +285,17 @@ export default function ProfileScreen() {
           </View>
         </ThemedView>
 
-        {/* 学习画像:把已有数据串成"我的学习轨迹" */}
+        {/* 学习画像:量化面板(词汇量 + 区间 + 分频段曲线 + 派生标签与建议) */}
         <SectionTitle text="学习画像" />
+        {profile ? (
+          <LearnerProfileCard profile={profile} />
+        ) : (
+          <ThemedView type="backgroundElement" style={styles.card}>
+            <ThemedText type="small" themeColor="textSecondary">
+              正在读取水平数据…
+            </ThemedText>
+          </ThemedView>
+        )}
         <ThemedView type="backgroundElement" style={styles.card}>
           <View style={styles.statRow}>
             <StatTile label="累计阅读" value={`${stats?.totalWordsRead ?? 0} 词`} />

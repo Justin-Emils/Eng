@@ -1,33 +1,44 @@
 /**
- * 推荐文章筛选(模块 B/学习闭环)。
+ * 推荐文章筛选(模块 B/学习闭环)—— 量化版。
  *
- * 打分维度(两条都要看,才不会再推"不符合水平"的文章):
- *   1. **难度档差**:文章所需词汇量(95% 覆盖率口径)相对用户词汇量差几档。
- *      目标区 = 比用户高 1 档(学习区);差 ≤ -1 太简单、≥ +3 太难会重罚。
- *      旧实现只看生词密度、完全不比难度,所以池子里没有合适的也会硬推,
- *      这正是"推荐不符合评估水平"的原因。
- *   2. **生词比例**(按 running words 计):3%–8% 理想。
+ * 打分改用**预测理解率**(连续量)做主判据,不再用"档差 ±1"(离散桶)。
+ * 原因:档宽 400–1200 词,"差 1 档"既可能是差 20 个词,也可能是差 990 个词,
+ * 同一个"略有挑战"标签背后难度差几十倍。
  *
- * 其他:已读文章不推荐(除非兜底);同批推荐尽量话题分散。
+ * 目标区间按用户选定 = 学习区:**理解率 93%–96%**(生词率 4%–7%)。
+ * 两个维度:
+ *   1. **理解率贴合度**(权重 0.7):越接近区间中枢(94.5%)越好;
+ *   2. **可学词适配**(权重 0.3):新词集中在"够得着"的范围(+2000 词以内)最有价值;
+ *      太少 → 学不到东西;噪音词过多(过难)→ 打折。
+ * 细分档位(bandGap / bandLabel)仅用于展示与兜底排序,不再参与主打分。
  */
 
-import { difficultyOf, fitLabel, unknownTokenRate } from '@/domain/difficulty';
+import {
+  coverageAt,
+  coverageFitLabel,
+  difficultyOf,
+  learnableWords,
+} from '@/domain/difficulty';
 import { bandIndexOf, bandLabelOf } from '@/domain/levels';
 import { isStudyCandidate } from '@/domain/wordlevel';
 import { extractWords } from '@/domain/wordmark';
 import type { Article } from '@/types';
 
-/** 理想生词比例区间(按 running words,而非去重词) */
-export const IDEAL_DENSITY = { min: 0.03, max: 0.08 };
-const IDEAL_CENTER = (IDEAL_DENSITY.min + IDEAL_DENSITY.max) / 2;
-/** 目标档差:比用户高 1 档最合适 */
-const TARGET_BAND_GAP = 1;
-/** 难度明显不合适的惩罚系数 */
-const OUT_OF_RANGE_PENALTY = 0.3;
+/** 目标理解率区间(学习区:生词率 4%–7%);与 domain/profile.ts 的 LEARNING_ZONE 一致 */
+export const TARGET_COVERAGE = { min: 0.93, max: 0.96 } as const;
+const COVERAGE_CENTER = (TARGET_COVERAGE.min + TARGET_COVERAGE.max) / 2;
+/** 理解率偏离中枢多少就基本不给分(0.06 ≈ 半个区间宽的两倍) */
+const COVERAGE_TOLERANCE = 0.06;
+/** 理想的可学新词数(去重口径):太少学不到东西,太多读得累 */
+const IDEAL_NEW_WORDS = 12;
+/** 明显不在目标区间的惩罚系数(仍保留兜底出场的机会) */
+const OUT_OF_RANGE_PENALTY = 0.35;
+/** 噪音词比例超过这个值再打折 */
+const NOISE_RATIO_LIMIT = 0.05;
 
 export interface RecommendInput {
   articles: Article[];
-  /** 用户词汇量 */
+  /** 用户词汇量(量化后的点估计) */
   userVocab: number;
   /** 已学过的词(小写) */
   learned: ReadonlySet<string>;
@@ -43,27 +54,32 @@ export interface RecommendInput {
 
 export interface Recommendation {
   article: Article;
-  /** 读懂 95% 词所需词汇量(连续难度值) */
+  /** 读懂 95% 词所需词汇量(文章难度,连续值) */
   requiredVocab: number;
-  /** 细分档位展示,如 "B1+ 中级上(3200–4000 词)" */
-  bandLabel: string;
-  /** 档差:正数表示比用户当前水平难几档 */
-  bandGap: number;
-  /** 人话评价:刚好合适 / 略有挑战 / 偏难 … */
-  fit: string;
-  /** 超出用户水平的实词比例(0–1,按 running words) */
+  /** 预测理解率(0–1):该用户能认识的 running words 比例 */
+  coverage: number;
+  /** 超出用户水平的实词比例(0–1)= 1 - coverage */
   unknownRate: number;
-  /** 是否落在理想生词区间 */
-  idealDensity: boolean;
-  /** 是否在"难度合适"的档差区间内 */
+  /** 值得学的去重新词数 */
+  learnableCount: number;
+  /** 其中考研大纲词数量 */
+  examWordCount: number;
+  /** 过难噪音词数 */
+  noisyCount: number;
+  /** 是否落在学习区(理解率 93%–96%) */
   inRange: boolean;
-  /** 该篇对用户的新词数(去重口径,用于展示) */
+  /** 人话评价:刚好合适 / 稍简单 / 偏难 …(按理解率判定) */
+  fit: string;
+  /** —— 参考层(旧体系,仅展示与兜底) —— */
+  bandLabel: string;
+  bandGap: number;
+  /** 该篇对用户的新词数(去重口径,与域内统一口径) */
   newWordCount: number;
   /** 新词示例(最多 3 个) */
   sampleNewWords: string[];
   /** 是否已读(仅兜底时可能出现) */
   read?: boolean;
-  /** 推荐理由 */
+  /** 推荐理由(量化文案) */
   reason: string;
 }
 
@@ -99,8 +115,11 @@ export function computeArticleNewWords(
 interface Row {
   article: Article;
   requiredVocab: number;
+  coverage: number;
+  learnable: number;
+  examWords: number;
+  noisy: number;
   bandGap: number;
-  unknownRate: number;
   ideal: boolean;
   inRange: boolean;
   score: number;
@@ -112,9 +131,8 @@ interface Row {
 /**
  * 生成推荐:
  * - 排除已读文章(excludeIds);
- * - 难度档差接近"高 1 档" + 生词比例贴近理想区间的优先;
- * - 明确不合适(档差 ≥ +3 或 ≤ -1)的只在兜底时出现;
- * - 附带推荐理由(难度档 + 生词比例 + 新词示例)。
+ * - 按理解率贴合度 + 可学词适配打分,目标区间内优先;
+ * - 附带量化推荐理由(理解率 / 新词数 / 参考档位)。
  */
 export function recommendFor(input: RecommendInput): Recommendation[] {
   const count = input.count ?? 3;
@@ -124,31 +142,50 @@ export function recommendFor(input: RecommendInput): Recommendation[] {
   const rows: Row[] = input.articles
     .map((article) => {
       const info = difficultyOf(article);
-      const gap = bandIndexOf(info.requiredVocab) - userBandIdx;
-      const rate = unknownTokenRate(article.paragraphs, input.userVocab);
-      const { newCount, samples } = computeArticleNewWords(
+      const coverage = coverageAt(article.paragraphs, input.userVocab);
+      const { learnable, examWords, noisy, samples } = learnableWords(
+        article.paragraphs,
+        input.userVocab,
+      );
+      const { newCount, samples: candidateSamples } = computeArticleNewWords(
         article,
         input.userVocab,
         input.learned,
         input.known,
       );
-      const ideal = rate >= IDEAL_DENSITY.min && rate <= IDEAL_DENSITY.max;
-      const inRange = gap >= -1 && gap <= 2;
-      // 难度分:档差越接近目标(高 1 档)越高
-      const levelScore = Math.max(0, 1 - Math.abs(gap - TARGET_BAND_GAP) / 4);
-      // 生词分:越接近理想区间中值越高
-      const rateScore = Math.max(0, 1 - Math.abs(rate - IDEAL_CENTER) / 0.1);
-      const score = (0.6 * levelScore + 0.4 * rateScore) * (inRange ? 1 : OUT_OF_RANGE_PENALTY);
+      const gap = bandIndexOf(info.requiredVocab) - userBandIdx;
+      const inRange = coverage >= TARGET_COVERAGE.min && coverage <= TARGET_COVERAGE.max;
+
+      // 理解率贴合度:越接近区间中枢越高
+      const coverageScore = Math.max(
+        0,
+        1 - Math.abs(coverage - COVERAGE_CENTER) / COVERAGE_TOLERANCE,
+      );
+      // 可学词适配:接近理想新词数最高;完全没有新词 → 0
+      const learnableScore =
+        learnable <= 0
+          ? 0
+          : Math.max(0, 1 - Math.abs(learnable - IDEAL_NEW_WORDS) / IDEAL_NEW_WORDS);
+      const noisePenalty = noisy / Math.max(1, info.tokens) > NOISE_RATIO_LIMIT ? 0.7 : 1;
+
+      const score =
+        (0.7 * coverageScore + 0.3 * learnableScore) *
+        (inRange ? 1 : OUT_OF_RANGE_PENALTY) *
+        noisePenalty;
+
       return {
         article,
         requiredVocab: info.requiredVocab,
+        coverage,
+        learnable,
+        examWords,
+        noisy,
         bandGap: gap,
-        unknownRate: rate,
-        ideal,
+        ideal: inRange,
         inRange,
         score,
         newCount,
-        samples,
+        samples: samples.length > 0 ? samples : candidateSamples,
         read: input.excludeIds?.has(article.id) ?? false,
       };
     })
@@ -170,7 +207,7 @@ export function recommendFor(input: RecommendInput): Recommendation[] {
   const rest = [...pickedSrc];
   while (picked.length < count && rest.length > 0) {
     const topicIsNew = (r: Row) => !r.article.topicTags.some((t) => usedTopics.has(t));
-    // 1) 难度合适 + 话题新 → 2) 难度合适 → 3) 话题新 → 4) 剩余里最好的
+    // 1) 目标区间内 + 话题新 → 2) 目标区间内 → 3) 话题新 → 4) 剩余里最好的
     let idx = rest.findIndex((r) => r.inRange && topicIsNew(r));
     if (idx < 0) idx = rest.findIndex((r) => r.inRange);
     if (idx < 0) idx = rest.findIndex(topicIsNew);
@@ -180,24 +217,26 @@ export function recommendFor(input: RecommendInput): Recommendation[] {
   }
 
   return picked.map((r) => {
-    const sampleText = r.samples.length > 0 ? ` · 新词如 ${r.samples.join('/')}` : '';
-    const band = bandLabelOf(r.requiredVocab);
-    const rateText = `${(r.unknownRate * 100).toFixed(1)}%`;
-    let reason: string;
-    if (r.read) {
-      reason = '已读回顾(其余文章都已读完)';
-    } else {
-      reason = `难度 ${band} · 生词 ${rateText} · ${fitLabel(r.bandGap)}${sampleText}`;
-    }
+    const fit = coverageFitLabel(r.coverage);
+    const coverageText = `${(r.coverage * 100).toFixed(1)}%`;
+    const examText = r.examWords > 0 ? `(其中 ${r.examWords} 个考研词)` : '';
+    const refBand = bandLabelOf(r.requiredVocab);
+    const reason = r.read
+      ? '已读回顾(其余文章都已读完)'
+      : `预计认识 ${coverageText} 的词 · 新词 ${r.learnable} 个${examText} · 参考档位 ${refBand}`;
+
     return {
       article: r.article,
       requiredVocab: r.requiredVocab,
-      bandLabel: band,
-      bandGap: r.bandGap,
-      fit: fitLabel(r.bandGap),
-      unknownRate: r.unknownRate,
-      idealDensity: r.ideal,
+      coverage: r.coverage,
+      unknownRate: 1 - r.coverage,
+      learnableCount: r.learnable,
+      examWordCount: r.examWords,
+      noisyCount: r.noisy,
       inRange: r.inRange,
+      fit,
+      bandLabel: refBand,
+      bandGap: r.bandGap,
       newWordCount: r.newCount,
       sampleNewWords: r.samples,
       read: r.read || undefined,

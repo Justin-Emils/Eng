@@ -307,7 +307,7 @@ export default function TodayScreen() {
               <ThemedText type="smallBold">为你挑选</ThemedText>
               <Pressable onPress={() => router.push('/(tabs)/library')}>
                 <ThemedText type="small" themeColor="textSecondary">
-                  按 {bandLabelOf(userVocab).split(' ')[0]} · 查看更多 ›
+                  按你的 {userVocab} 词 · 查看更多 ›
                 </ThemedText>
               </Pressable>
             </View>
@@ -328,8 +328,9 @@ export default function TodayScreen() {
                     article: p.article,
                     bandId: p.bandLabel.split(' ')[0],
                     requiredVocab: p.requiredVocab,
-                    unknownRate: p.unknownRate,
+                    coverage: p.coverage,
                     fit: p.fit,
+                    learnableCount: p.learnableCount,
                     sampleNewWords: p.sampleNewWords,
                   }}
                 />

@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { UserLevel } from '@/types';
+import type { AssessmentRound, UserLevel } from '@/types';
 
 const USER_LEVEL_KEY = 'readingapp.userlevel.v1';
 
@@ -17,6 +17,23 @@ export const DEFAULT_USER_LEVEL: UserLevel = {
   updatedAt: 0,
 };
 
+/** 只保留形状正确的档位记录(脏数据会让画像算出 NaN) */
+function normalizeRounds(raw: unknown): AssessmentRound[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: AssessmentRound[] = [];
+  for (const item of raw) {
+    const r = item as Partial<AssessmentRound>;
+    if (typeof r.threshold !== 'number' || typeof r.total !== 'number') continue;
+    if (r.total <= 0) continue;
+    out.push({
+      threshold: r.threshold,
+      total: r.total,
+      known: typeof r.known === 'number' ? Math.max(0, Math.min(r.total, r.known)) : 0,
+    });
+  }
+  return out.length > 0 ? out : undefined;
+}
+
 export async function getUserLevel(): Promise<UserLevel> {
   try {
     const raw = await AsyncStorage.getItem(USER_LEVEL_KEY);
@@ -27,6 +44,10 @@ export async function getUserLevel(): Promise<UserLevel> {
       level: parsed.level ?? 'B1',
       assessed: Boolean(parsed.assessed),
       updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : 0,
+      rounds: normalizeRounds(parsed.rounds),
+      answers: typeof parsed.answers === 'number' ? parsed.answers : undefined,
+      knownAnswers: typeof parsed.knownAnswers === 'number' ? parsed.knownAnswers : undefined,
+      mode: parsed.mode === 'fine' || parsed.mode === 'quick' ? parsed.mode : undefined,
     };
   } catch {
     return DEFAULT_USER_LEVEL;

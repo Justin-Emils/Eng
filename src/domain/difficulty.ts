@@ -14,6 +14,7 @@
  */
 
 import { LEVEL_BANDS, bandOf, type LevelBand } from '@/domain/levels';
+import { isExternalWord } from '@/domain/external';
 import { frqToThreshold, wordThreshold } from '@/domain/wordlevel';
 import { freqRankOf } from '@/domain/wordfreq';
 import { extractWords } from '@/domain/wordmark';
@@ -132,6 +133,84 @@ export function fitLabel(bandGapValue: number): string {
   if (bandGapValue === 1) return '略有挑战';
   if (bandGapValue === 2) return '偏难';
   return '太难';
+}
+
+/* ------------------------------------------------------------------ *
+ * 量化匹配:预测理解率 + 可学词
+ *
+ * 档差是离散的桶,"预测理解率"才是连续量 —— 推荐改用后者做主判据。
+ * ------------------------------------------------------------------ */
+
+/** 预测理解率 = 该词汇量下能认识的 running words 比例(1 - 生词率) */
+export function coverageAt(paragraphs: readonly string[], userVocab: number): number {
+  return 1 - unknownTokenRate(paragraphs, userVocab);
+}
+
+/**
+ * 按理解率给一句人话评价(取代按档差的旧口径)。
+ * 阈值与 domain/profile.ts 的 LEARNING_ZONE(93%–96%)对齐。
+ */
+export function coverageFitLabel(coverage: number): string {
+  if (coverage >= 0.985) return '偏简单';
+  if (coverage >= 0.965) return '稍简单';
+  if (coverage >= 0.93) return '刚好合适';
+  if (coverage >= 0.9) return '略有挑战';
+  return '太难';
+}
+
+/** 是否够得着:门槛高于用户词汇量 2000 以内的词,学了有回报 */
+const LEARNABLE_LOOKAHEAD = 2000;
+/** 噪音词:门槛高出用户词汇量 3000 以上,查了也难记住 */
+const NOISE_GAP = 3000;
+
+export interface LearnableInfo {
+  /** 值得学的去重词数 */
+  learnable: number;
+  /** 其中属于考研大纲词的数量 */
+  examWords: number;
+  /** 噪音词数(过难,建议忽略) */
+  noisy: number;
+  /** 示例(最多 3 个) */
+  samples: string[];
+}
+
+/** 该词是否有任何门槛数据(词频或考试标签);没有就是词典没覆盖,归为"中性"不计入 */
+function hasThresholdData(word: string): boolean {
+  return freqRankOf(word) != null || wordThreshold(word) != null;
+}
+
+/**
+ * 统计一篇文章对某词汇量的"可学词"与"噪音词"。
+ * 与生词率不同:生词率只看"不认识多少",这里进一步区分**认了值不值得**——
+ * 同为 5% 生词率,一篇文章的新词集中在 +500 档,另一篇全在 +4000 档,价值完全不同。
+ */
+export function learnableWords(
+  paragraphs: readonly string[],
+  userVocab: number,
+): LearnableInfo {
+  const tokens = extractWords(paragraphs.join(' '));
+  const unique = [...new Set(tokens.map((t) => t.toLowerCase()))];
+  let learnable = 0;
+  let examWords = 0;
+  let noisy = 0;
+  const samples: string[] = [];
+
+  for (const word of unique) {
+    const threshold = thresholdOf(word);
+    if (threshold <= userVocab) continue;
+    if (threshold === UNKNOWN_THRESHOLD && !hasThresholdData(word)) continue;
+    if (threshold > userVocab + NOISE_GAP) {
+      noisy += 1;
+      continue;
+    }
+    if (threshold <= userVocab + LEARNABLE_LOOKAHEAD) {
+      learnable += 1;
+      if (isExternalWord(word)) examWords += 1;
+      if (samples.length < 3) samples.push(word);
+    }
+  }
+
+  return { learnable, examWords, noisy, samples };
 }
 
 export const LEVEL_BAND_COUNT = LEVEL_BANDS.length;
