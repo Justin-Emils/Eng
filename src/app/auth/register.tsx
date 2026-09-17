@@ -5,7 +5,7 @@
  * 不需要去邮箱点链接 —— 这也是国内网络下最省事的方式。
  */
 
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
@@ -19,6 +19,7 @@ import { register } from '@/domain/auth/store';
 import { validateEmail, validateNickname, validatePassword, validatePasswordConfirm } from '@/domain/auth/validate';
 import { pushProfile } from '@/domain/sync';
 import { getAccount, saveAccount } from '@/storage/account';
+import { getSettings } from '@/storage/settings';
 
 interface FieldErrors {
   nickname?: string;
@@ -29,6 +30,9 @@ interface FieldErrors {
 
 export default function RegisterScreen() {
   const router = useRouter();
+  /** 从欢迎页进来的(新用户首次路径):成功后要进 App,不能原路退回欢迎页 */
+  const params = useLocalSearchParams<{ from?: string }>();
+  const fromGate = params.from === 'welcome';
 
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
@@ -85,11 +89,24 @@ export default function RegisterScreen() {
         return;
       }
 
-      setSuccess('注册成功,已自动登录。正在返回…');
-      setTimeout(goBack, 900);
+      /**
+       * 新注册用户接下来走「完善个人信息 + 学习计划」;
+       * 如果本机早就完成过引导(在「我的」里补注册账号的情形),就原路返回,不重复问一遍。
+       */
+      const settings = await getSettings();
+      if (!settings.onboarded) {
+        setSuccess('注册成功,已自动登录。接下来完善资料与学习计划…');
+        setTimeout(() => router.replace('/onboarding'), 900);
+      } else if (fromGate) {
+        setSuccess('注册成功,已自动登录。');
+        setTimeout(() => router.replace('/(tabs)'), 900);
+      } else {
+        setSuccess('注册成功,已自动登录。');
+        setTimeout(goBack, 900);
+      }
     } catch (e) {
       setFailure(e instanceof Error ? e.message : '注册失败,请稍后重试');
-    } finally {
+      // 只有失败时才解除 loading:成功后会跳走,期间保持 loading 可以防止连点重复注册
       setBusy(false);
     }
   };
@@ -99,7 +116,9 @@ export default function RegisterScreen() {
       title="注册"
       subtitle="用一个邮箱创建账号,注册成功即登录,不需要去邮箱确认。"
       footer={
-        <Pressable onPress={() => router.replace('/auth/login')} hitSlop={8}>
+        <Pressable
+          onPress={() => router.replace(fromGate ? '/auth/login?from=welcome' : '/auth/login')}
+          hitSlop={8}>
           <ThemedText type="small" themeColor="textSecondary">
             已经有账号了?<ThemedText type="small" themeColor="accent">去登录</ThemedText>
           </ThemedText>

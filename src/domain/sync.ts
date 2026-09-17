@@ -13,6 +13,8 @@ import { AuthError } from '@/domain/auth/api';
 import { ensureAccessToken, getAuthState } from '@/domain/auth/store';
 import { exportBackup, importBackup } from '@/domain/backup';
 import { DEFAULT_AVATAR, getAccount, saveAccount } from '@/storage/account';
+import { getSettings } from '@/storage/settings';
+import { getWords } from '@/storage/words';
 
 export interface RemoteBackup {
   /** 备份 JSON 原文(可直接交给 importBackup) */
@@ -177,6 +179,46 @@ export async function mergeProfileFromCloud(): Promise<void> {
     patch.avatar = remote.avatar;
   }
   if (Object.keys(patch).length > 0) await saveAccount(patch);
+}
+
+/**
+ * 登录成功后自动同步一次(登录页 / 启动时都会调)。
+ *
+ * 这里的策略是**只补不覆盖**,因为"自动"意味着用户没有确认过:
+ * - 昵称 / 头像:本机空的才用云端的填(换新手机的典型场景);
+ * - 学习数据:只有本机完全为空(还没有生词、也没完成过引导)时才自动导入 ——
+ *   这正是"新手机登录后数据自动回来"的预期行为;
+ * - 本机已有数据时不自动覆盖,而是把决定权交回用户(账号页的「从云端恢复」会显示
+ *   云端与本机各有多少词,再由用户确认)。
+ */
+export async function autoSyncAfterLogin(): Promise<{ restored: boolean; note: string }> {
+  // 资料先合(失败不影响后面的数据同步判断)
+  try {
+    await mergeProfileFromCloud();
+  } catch {
+    // 忽略:资料合并失败不该阻断登录
+  }
+
+  const [words, settings] = await Promise.all([getWords(), getSettings()]);
+  const localIsEmpty = words.length === 0 && !settings.onboarded;
+
+  if (!localIsEmpty) {
+    return {
+      restored: false,
+      note: '本机已有学习数据,未自动覆盖;需要时可在账号页点「从云端恢复」',
+    };
+  }
+
+  const remote = await pullBackup();
+  if (!remote) {
+    return { restored: false, note: '云端还没有备份,完成引导后可以在账号页上传' };
+  }
+
+  const count = await importBackup(remote.raw);
+  return {
+    restored: true,
+    note: `已从云端恢复 ${count} 项数据(${remote.wordCount} 个生词)`,
+  };
 }
 
 /** 读取云端昵称 / 头像(没有则返回 null) */

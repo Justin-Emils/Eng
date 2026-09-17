@@ -19,15 +19,19 @@ export function PrimaryButton({
   loading = false,
   disabled = false,
   style,
+  variant = 'solid',
 }: {
   label: string;
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
+  /** solid = 实心主操作;outline = 描边次操作(用在同一屏里有两个并列按钮时) */
+  variant?: 'solid' | 'outline';
 }) {
   const theme = useTheme();
   const isDisabled = disabled || loading;
+  const isOutline = variant === 'outline';
 
   return (
     <Pressable
@@ -36,14 +40,25 @@ export function PrimaryButton({
       hitSlop={6}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: isDisabled ? theme.backgroundSelected : theme.accentStrong },
+        isOutline && styles.outline,
+        {
+          backgroundColor: isDisabled
+            ? theme.backgroundSelected
+            : isOutline
+              ? 'transparent'
+              : theme.accentStrong,
+          borderColor: isDisabled ? theme.border : theme.accent,
+        },
         pressed && !isDisabled && styles.pressed,
         style,
       ]}>
       {loading ? (
-        <ActivityIndicator size="small" color={theme.onAccentStrong} />
+        <ActivityIndicator size="small" color={isOutline ? theme.accent : theme.onAccentStrong} />
       ) : (
-        <ThemedText type="smallBold" themeColor="onAccentStrong" style={styles.label}>
+        <ThemedText
+          type="smallBold"
+          themeColor={isOutline ? 'accent' : 'onAccentStrong'}
+          style={styles.label}>
           {label}
         </ThemedText>
       )}
@@ -60,5 +75,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
   },
   label: { fontSize: 15 },
+  /** 描边款只加边框,宽度靠 borderWidth 与实心款对齐(避免两按钮高度差 1px) */
+  outline: { borderWidth: 1 },
   pressed: { opacity: 0.85 },
 });

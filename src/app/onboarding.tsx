@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -8,14 +8,18 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { saveDailyGoal, saveNickname, saveOnboarded } from '@/storage/settings';
+import { getAccount, saveAccount } from '@/storage/account';
+import { saveDailyGoal, saveOnboarded } from '@/storage/settings';
 
 /**
- * 首次引导(只在第一次打开时出现):
- *   1. 欢迎 + 填个昵称(纯本地,不涉及账号);
+ * 首次设置(注册完成后、或选择"先不登录"后进入):
+ *   1. 完善个人信息(昵称 —— 头像在「我的 → 账号」里改);
  *   2. 设每日目标(读几篇 / 复习几个词);
- *   3. 引导去做词汇量评估(可跳过,之后首页也会提醒)。
- * 完成后写 onboarded=true,不再打扰。
+ *   3. 引导做词汇量评估(可跳过,之后首页也会提醒)。
+ *
+ * 注意:欢迎语和「登录 / 注册」在 /welcome 页面完成,这里只管"建立本机学习档案"。
+ * 老用户在新手机登录时不会走到这里 —— 云端备份里已经带着目标与水平,
+ * 登录后自动恢复即可(见 domain/sync.ts 的 autoSyncAfterLogin)。
  */
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
@@ -29,12 +33,25 @@ export default function OnboardingScreen() {
   const [reviewWords, setReviewWords] = useState(10);
   const [saving, setSaving] = useState(false);
 
+  // 注册时若已经填过昵称,这里带出来不用再输一遍
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const account = await getAccount();
+      if (active && account.nickname) setNickname(account.nickname);
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const finish = async (goAssess: boolean) => {
     if (saving) return;
     Keyboard.dismiss();
     setSaving(true);
     try {
-      if (nickname.trim()) await saveNickname(nickname);
+      // 昵称写入账号档案(「我的」页与账号页读的是这里)
+      if (nickname.trim()) await saveAccount({ nickname: nickname.trim() });
       await saveDailyGoal({ articles: goalArticles, reviewWords });
       await saveOnboarded(true);
       if (goAssess) {
@@ -79,33 +96,16 @@ export default function OnboardingScreen() {
         {step === 0 ? (
           <>
             <ThemedText type="subtitle" style={styles.title}>
-              欢迎使用考研英语阅读
+              完善个人信息
             </ThemedText>
             <ThemedText type="small" themeColor="textSecondary" style={styles.desc}>
-              每天一篇短阅读,按你的词汇量标出「该学的生词」,边读边积累。
+              怎么称呼你?这只是 App 里显示的名字,之后可以在「我的 → 账号」里随时改,
+              头像也在那里换。
             </ThemedText>
-
-            <ThemedView type="backgroundElement" style={styles.card}>
-              {[
-                ['🎯', '按你的水平推荐', '评估词汇量后,只推「比你高 1 档」的文章'],
-                ['🔵', '生词自动标蓝', '超出你词汇量的词标蓝,点一下就能查义、标记学习'],
-                ['🔁', '读完自动进复习', '生词本按遗忘曲线排期,每天复习几个就能记住'],
-              ].map(([emoji, title, sub]) => (
-                <View key={title} style={styles.featureRow}>
-                  <ThemedText style={styles.featureEmoji}>{emoji}</ThemedText>
-                  <View style={styles.featureText}>
-                    <ThemedText type="smallBold">{title}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {sub}
-                    </ThemedText>
-                  </View>
-                </View>
-              ))}
-            </ThemedView>
 
             <View style={styles.field}>
               <ThemedText type="small" themeColor="textSecondary">
-                怎么称呼你?(可留空,纯本地显示)
+                昵称(可留空)
               </ThemedText>
               <TextInput
                 value={nickname}

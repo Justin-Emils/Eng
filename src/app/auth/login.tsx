@@ -5,7 +5,7 @@
  * 并把登录态写进全局 store —— 云同步、账号信息都会立刻跟着变。
  */
 
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
@@ -17,17 +17,22 @@ import { ThemedText } from '@/components/themed-text';
 import { isBackendConfigured } from '@/config/backend';
 import { signIn } from '@/domain/auth/store';
 import { validateEmail, validatePassword } from '@/domain/auth/validate';
-import { mergeProfileFromCloud } from '@/domain/sync';
+import { autoSyncAfterLogin } from '@/domain/sync';
 import { useAuth } from '@/hooks/use-auth';
+import { getSettings } from '@/storage/settings';
 
 export default function LoginScreen() {
   const router = useRouter();
   const auth = useAuth();
+  /** 从欢迎页进来的(新用户首次路径):成功后要进 App,不能原路退回欢迎页 */
+  const params = useLocalSearchParams<{ from?: string }>();
+  const fromGate = params.from === 'welcome';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [failure, setFailure] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const goBack = () => {
@@ -48,12 +53,37 @@ export default function LoginScreen() {
     setBusy(true);
     try {
       await signIn(email, password);
-      // 首次在新手机登录时,把云端的昵称/头像补到本机(失败不影响登录本身)
-      void mergeProfileFromCloud().catch(() => {});
-      goBack();
+
+      /**
+       * 老用户登录后自动同步一次云端数据(只补不覆盖,见 domain/sync.ts):
+       * 新手机上本机为空 → 直接把进度接上;本机已有数据 → 只合并昵称/头像,不覆盖。
+       */
+      let note = '';
+      let restored = false;
+      try {
+        const result = await autoSyncAfterLogin();
+        note = result.note;
+        restored = result.restored;
+      } catch (e) {
+        note = `自动同步失败:${e instanceof Error ? e.message : '未知错误'}(可在账号页手动上传 / 恢复)`;
+      }
+      setSuccess(note);
+
+      const settings = await getSettings();
+      if (!settings.onboarded) {
+        // 还没建本机学习档案:云端恢复成功就直接开始用,否则补完引导
+        setTimeout(() => router.replace(restored ? '/(tabs)' : '/onboarding'), 1100);
+        return;
+      }
+      if (fromGate) {
+        // 本来就在欢迎页(没有一个"上一页"可回),直接进首页
+        setTimeout(() => router.replace('/(tabs)'), 900);
+        return;
+      }
+      setTimeout(goBack, 800);
     } catch (e) {
       setFailure(e instanceof Error ? e.message : '登录失败,请稍后重试');
-    } finally {
+      // 只有失败时才解除 loading:成功后会跳走,期间保持 loading 可以防止连点重复登录
       setBusy(false);
     }
   };
@@ -69,7 +99,9 @@ export default function LoginScreen() {
               忘记密码?
             </ThemedText>
           </Pressable>
-          <Pressable onPress={() => router.replace('/auth/register')} hitSlop={8}>
+          <Pressable
+            onPress={() => router.replace(fromGate ? '/auth/register?from=welcome' : '/auth/register')}
+            hitSlop={8}>
             <ThemedText type="small" themeColor="textSecondary">
               还没有账号?<ThemedText type="small" themeColor="accent">去注册</ThemedText>
             </ThemedText>
@@ -111,6 +143,7 @@ export default function LoginScreen() {
       />
 
       {failure ? <StatusNote kind="error">{failure}</StatusNote> : null}
+      {success ? <StatusNote kind="success">{success}</StatusNote> : null}
 
       <PrimaryButton label="登录" loading={busy} onPress={() => void handleSubmit()} />
 
