@@ -74,6 +74,15 @@ function translateError(status: number, body: unknown): AuthError {
   const mapped = ERROR_MESSAGES[code];
   if (mapped) return new AuthError(mapped, code);
 
+  // SMTP 没配好时 GoTrue 会返回 500 + "Error sending ... email",原文里带 smtp/sending。
+  // 这种情况必须说清是"邮件通道"的问题,否则用户会以为是网络或密码错了。
+  if (/smtp|sending .*email|error sending/i.test(`${backendText} ${code}`)) {
+    return new AuthError(
+      '验证码邮件发送失败:Supabase 的邮件通道没配好(免费版需先接自己的 SMTP 才能改模板与发信)',
+      code,
+    );
+  }
+
   if (status === 401 || status === 403) return new AuthError('登录状态已失效,请重新登录', code);
   if (status === 429) return new AuthError('操作太频繁了,请稍后再试', code);
   if (status >= 500) return new AuthError('服务器暂时不可用,请稍后重试', code);
