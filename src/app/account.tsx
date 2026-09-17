@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -36,6 +36,30 @@ import { getWords } from '@/storage/words';
  * - 下半「云端账号」:邮箱注册登录、上传/恢复学习数据、改密码、退出。
  * 数据本身始终以本机为准,云端只是搬运通道,所以断网、不登录都不影响使用。
  */
+/**
+ * 云端备份的读取结果。刻意做成显式状态机而不是"有没有值":
+ * 「没有备份」「还没读」「读失败」是三件不同的事,UI 上必须分别说清,
+ * 否则用户看到空白不知道是云端空还是网络挂了。
+ */
+type CloudStatus =
+  | { kind: 'idle' }
+  | { kind: 'empty' }
+  | { kind: 'ready'; wordCount: number; updatedAt: string }
+  | { kind: 'error'; message: string };
+
+/** 把 ISO 时间说成人话(刚刚 / N 分钟前 / 具体时间) */
+function formatWhen(iso: string): string {
+  if (!iso) return '未知时间';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '未知时间';
+  const diff = Date.now() - t;
+  if (diff < 0) return new Date(t).toLocaleString();
+  if (diff < 60_000) return '刚刚';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
+  return new Date(t).toLocaleString();
+}
+
 export default function AccountScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -51,6 +75,38 @@ export default function AccountScreen() {
   const [backupInfo, setBackupInfo] = useState<string | null>(null);
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
+  const [cloud, setCloud] = useState<CloudStatus>({ kind: 'idle' });
+
+  /**
+   * 主动去云端读一次备份概况 —— 这是"上传是否真的成功"的独立证据:
+   * 它走的是 GET /rest/v1/backups,读回来的词数和时间都来自服务器。
+   * 注意:这里刻意不做同步的 setState,只在请求返回后写入结果,
+   * 避免在 effect 里同步改状态引发的级联渲染。
+   */
+  const refreshCloud = useCallback(async () => {
+    // 未登录时这块 UI 根本不渲染,不需要改状态;
+    // 所有 setState 都发生在 await 之后,避免 effect 里的同步 setState
+    if (auth.status !== 'authed') return;
+    try {
+      const remote = await pullBackup();
+      setCloud(
+        remote
+          ? { kind: 'ready', wordCount: remote.wordCount, updatedAt: remote.updatedAt }
+          : { kind: 'empty' },
+      );
+    } catch (e) {
+      setCloud({ kind: 'error', message: e instanceof Error ? e.message : '读取失败' });
+    }
+  }, [auth.status]);
+
+  useEffect(() => {
+    // 外面再包一层 async IIFE 并先 await 一次:让 refreshCloud 里的 setState
+    // 落在 await 之后,满足 react-hooks/set-state-in-effect 的要求
+    void (async () => {
+      await Promise.resolve();
+      await refreshCloud();
+    })();
+  }, [refreshCloud]);
 
   useEffect(() => {
     let active = true;
@@ -162,6 +218,8 @@ export default function AccountScreen() {
     try {
       await pushBackup();
       setSyncNote(`✓ 已上传到云端(${wordCount} 个生词 + 进度、设置)`);
+      // 立刻回读一次云端,让下面那行状态显示的是服务器上的真实内容
+      await refreshCloud();
     } catch (e) {
       setSyncNote(`✗ 上传失败:${e instanceof Error ? e.message : '未知错误'}`);
     } finally {
@@ -193,6 +251,7 @@ export default function AccountScreen() {
                 try {
                   const n = await restoreFromCloud(remote);
                   setSyncNote(`✓ 已从云端恢复 ${n} 项数据,请重启 App 生效`);
+                  await refreshCloud();
                 } catch (e) {
                   setSyncNote(`✗ 恢复失败:${e instanceof Error ? e.message : '未知错误'}`);
                 }
@@ -353,6 +412,20 @@ export default function AccountScreen() {
                 sublabel={auth.session?.user.email ?? ''}
                 value="✓ 已登录"
               />
+              {/* 云端真实状态:数据来自服务器的回读,不是本地推测 */}
+              {cloud.kind === 'ready' ? (
+                <SettingRow
+                  label="云端已有备份"
+                  sublabel={`更新于 ${formatWhen(cloud.updatedAt)} · 点「恢复」可取回`}
+                  value={`${cloud.wordCount} 个生词`}
+                />
+              ) : cloud.kind === 'empty' ? (
+                <SettingRow label="云端还没有备份" sublabel="点下面的「上传」创建第一份" value="空" />
+              ) : cloud.kind === 'error' ? (
+                <SettingRow label="云端状态读取失败" sublabel={cloud.message} value="—" />
+              ) : (
+                <SettingRow label="云端状态" value="读取中…" />
+              )}
               <SettingRow
                 label="上传本机数据到云端"
                 sublabel="把生词本、进度、设置整份推到云端(覆盖云端旧备份)"
