@@ -55,3 +55,6 @@ local.properties
 
 # 开发脚本的临时产物
 scripts/out/
+
+# 本地临时产物(构建日志、APK 暂存、配置备份等),不进仓库
+.artifacts/
