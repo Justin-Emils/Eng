@@ -1,4 +1,4 @@
-# 清理 GitHub Releases:只保留起点版本与最新版本,删除中间的过程版本(含对应 tag)。
+﻿# 清理 GitHub Releases:只保留起点版本与最新版本,删除中间的过程版本(含对应 tag)。
 #
 # 用法(在仓库根目录的终端里):
 #   pwsh -File scripts/cleanup-releases.ps1 -DryRun     # 先看会删哪些
@@ -15,7 +15,19 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$cred = "protocol=https`nhost=github.com`n`n" | git credential fill 2>$null
+# Windows PowerShell 5.1 默认不一定启用 TLS 1.2,不设置会直接连不上 api.github.com
+try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
+
+$cred = $null
+$credIn = Join-Path (git rev-parse --git-dir) 'cred-in.tmp'
+try {
+  # 必须用文件 + cmd 重定向:PowerShell 管道会把行尾写成 CRLF,git 解析不了
+  [System.IO.File]::WriteAllText($credIn, "protocol=https`nhost=github.com`n`n", (New-Object System.Text.UTF8Encoding($false)))
+  $env:GIT_TERMINAL_PROMPT = '0'
+  $cred = cmd /c "git credential fill < `"$credIn`"" 2>$null
+} finally {
+  if (Test-Path $credIn) { Remove-Item $credIn -Force }
+}
 $token = ($cred | Where-Object { $_ -like 'password=*' }) -replace '^password=', ''
 if (-not $token) {
   Write-Host '未取到 GitHub 凭据。请先随便执行一次 git push(或 git ls-remote)让 git 记下凭据,再重跑本脚本。' -ForegroundColor Yellow
