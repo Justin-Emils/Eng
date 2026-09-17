@@ -55,6 +55,18 @@ cd android
 > Windows 上请把 `JAVA_HOME` 指向 JDK 17/21(JDK 24 与 Android Gradle 插件不兼容)。
 > Release 默认用 debug 签名,自用安装可直接侧载;上架需换正式 keystore。
 
+## 发版约定
+
+- **每次改动都 `git commit`** —— 提交是代码轨迹,不代表发版。
+- **自用验证不发 Release**:本地 `assembleRelease` 出 APK 直接装到手机上,不产生版本号、不打扰关注者。
+- **只有明确说"发版"时才发布 Release**,版本号按 SemVer 递增:
+  - 修 bug / 打磨 UI → PATCH(`v1.0.13`)
+  - 新增功能(如云同步、账号体系) → MINOR(`v1.1.0`)
+  - 数据结构不兼容(备份格式、存储键重构) → MAJOR(`v2.0.0`)
+- Release 说明只写"这一版相比上一版新增/修了什么",不累积历史。
+
+> GitHub 上只保留两个版本:`v1.0.0`(起点)与最新一个;中间过程版本不长期留存。
+
 ## 目录结构
 
 ```
