@@ -22,8 +22,8 @@ const MIN_SHOW_MS = 1300;
  * 用 expo-image 加载动图(WebP),项目已内置该依赖,不需要 video/lottie 之类的额外模块。
  * 动画来自素材里的 webm,已转成 480×480 / 48 帧 / 12fps 循环,并且**背景是透明的**
  * (黑底按亮度抠掉),所以这里只需要铺一层底色。
- * 因为底色是品牌蓝,所以用白色剪影版 walk-white;若以后把底色改成白色,
- * 换成 walk-dark 即可(assets/anim 下两版都在)。
+ * 动画已把角色合成在品牌蓝底上(不透明):WebP 动图的帧间混合会让透明区不擦除上一帧,若以后把底色改成白色,
+ * 导致每帧叠加出鬼影;合成成不透明就绕开了这个问题,体积也更小。assets/anim 下另有透明版备用。
  */
 export function AnimatedSplashOverlay({ ready = true }: { ready?: boolean }) {
   const [minElapsed, setMinElapsed] = useState(false);
@@ -62,7 +62,7 @@ export function AnimatedSplashOverlay({ ready = true }: { ready?: boolean }) {
   const content = (
     <Image
       style={styles.walk}
-      source={require('@/assets/anim/walk-white.webp')}
+      source={require('@/assets/anim/walk-blue.webp')}
       contentFit="contain"
     />
   );
