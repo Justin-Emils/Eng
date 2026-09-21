@@ -98,7 +98,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
       </Stack>
-      <AnimatedSplashOverlay />
+      <AnimatedSplashOverlay ready={bootChecked} />
     </ThemeProvider>
   );
 }

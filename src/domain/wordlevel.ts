@@ -57,7 +57,23 @@ export function bandLabel(threshold: number): string {
 
 /** 词条元数据(精确) */
 export function metaFor(word: string): { tags: string[]; frq: number | null; bnc: number | null } | null {
-  return WORD_META[normalizeWord(word)] ?? null;
+  return normalizeMeta(WORD_META[normalizeWord(word)]);
+}
+
+/**
+ * 把生成的词条数据补齐成固定形状。
+ * 必须做的原因:WORD_META 是脚本生成的,实际存在**没有 tags 字段**的词条,
+ * 直接读 m.tags.length 会抛 TypeError —— 一篇含这类词的文章会让难度计算整个崩掉。
+ * (批量语料验证时踩到过:403 本书里就有这样的词)
+ */
+function normalizeMeta(raw: unknown): { tags: string[]; frq: number | null; bnc: number | null } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const m = raw as { tags?: unknown; frq?: unknown; bnc?: unknown };
+  return {
+    tags: Array.isArray(m.tags) ? m.tags.filter((t): t is string => typeof t === 'string') : [],
+    frq: typeof m.frq === 'number' ? m.frq : null,
+    bnc: typeof m.bnc === 'number' ? m.bnc : null,
+  };
 }
 
 /** 词条元数据(含词干还原:developing→develop),先精确后候选 */
@@ -65,7 +81,7 @@ function metaForWithStem(word: string): { tags: string[]; frq: number | null; bn
   const exact = metaFor(word);
   if (exact) return exact;
   for (const candidate of lookupCandidates(word)) {
-    const hit = WORD_META[candidate];
+    const hit = normalizeMeta(WORD_META[candidate]);
     if (hit) return hit;
   }
   return null;
