@@ -17,6 +17,13 @@ const DURATION = 600;
 const MIN_SHOW_MS = 1300;
 
 /**
+ * 小人显示尺寸:按屏宽取 66%(上限 300)。
+ * 原来写死 150 偏小;素材原生 1000x1000,动画导出为 720x720@30fps,
+ * 放大到 300 以内不会糊。
+ */
+const WALK_SIZE = Math.min(Math.round(Dimensions.get('screen').width * 0.66), 300);
+
+/**
  * 启动遮罩:品牌蓝底 + 行走小人动画。
  *
  * 用 expo-image 加载动图(WebP),项目已内置该依赖,不需要 video/lottie 之类的额外模块。
@@ -161,10 +168,10 @@ const styles = StyleSheet.create({
     width: 76,
     height: 71,
   },
-  /** 行走小人:透明背景,尺寸略大于原 logo,让动作看得清 */
+  /** 行走小人 */
   walk: {
-    width: 150,
-    height: 150,
+    width: WALK_SIZE,
+    height: WALK_SIZE,
   },
   background: {
     borderRadius: 40,
