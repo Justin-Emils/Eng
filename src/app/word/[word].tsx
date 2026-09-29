@@ -193,19 +193,20 @@ export default function WordDetailScreen() {
           )}
         </View>
 
-        {/* 操作区:未收录词也能加入生词本(释义暂空,可稍后补) */}
-        {headword ? (
+        {/*
+          操作区:只在**尚未收藏**时显示"加入生词本"。
+          已收藏时这里不再出现任何按钮 —— 反馈原话:「不需要『已在生词本点按取消』,
+          保留一个『从生词本删除』就行」。删除与"标为已掌握"都在下面的生词管理区,
+          两处语义不重复。
+        */}
+        {headword && !saved ? (
           <Pressable
             onPress={() => void handleSave()}
             disabled={saving}
             style={({ pressed }) => pressed && styles.pressed}>
-            <ThemedView
-              type={saved ? 'backgroundElement' : 'backgroundSelected'}
-              style={styles.saveBtn}>
-              <ThemedText
-                type="smallBold"
-                style={{ color: saved ? theme.textSecondary : theme.accent }}>
-                {saving ? '处理中…' : saved ? '✓ 已在生词本(点按取消)' : '＋ 加入生词本'}
+            <ThemedView type="backgroundSelected" style={styles.saveBtn}>
+              <ThemedText type="smallBold" themeColor="accent">
+                {saving ? '处理中…' : '＋ 加入生词本'}
               </ThemedText>
             </ThemedView>
           </Pressable>

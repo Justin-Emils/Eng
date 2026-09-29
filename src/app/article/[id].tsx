@@ -34,14 +34,6 @@ import { getUserLevel } from '@/storage/user';
 const MIN_FONT = 16;
 const MAX_FONT = 28;
 const DEFAULT_FONT = 19;
-/**
- * 到达末段后停留多久(ms)自动视为读完。
- *
- * 这个规则以前**界面上一个字都没写**,用户只能猜(反馈原话:「像摩斯电码一样让大家猜
- * 你是怎么想的」)。现在补两处:footer 写清规则;到达末段时给出实时提示。
- * 时长从 4000 收到 3000:足够避免"划过去就被判读完",也不至于让人干等。
- */
-const AUTO_COMPLETE_DELAY = 3000;
 
 /**
  * 阅读页(模块 D + M1.2 进度续读 / 打卡):
@@ -84,7 +76,6 @@ export default function ArticleReaderScreen() {
   // 已保存进度的段索引(避免滚动时重复写)
   const lastSavedIndexRef = useRef(0);
   // 自动完成打卡计时器
-  const completeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // completed 的 ref 镜像:供 setTimeout 回调读最新值(避免闭包过期);用 effect 同步,不在渲染期写 ref
   const completedRef = useRef(false);
   useEffect(() => {
@@ -170,8 +161,7 @@ export default function ArticleReaderScreen() {
   // 卸载时清理计时器
   useEffect(() => {
     return () => {
-      if (completeTimerRef.current) clearTimeout(completeTimerRef.current);
-    };
+      };
   }, []);
 
   /**
@@ -272,17 +262,11 @@ export default function ArticleReaderScreen() {
     // 读到末段:启动自动完成计时,并把"已到末段"暴露给界面
     const reachedEnd = visible.includes(paragraphItems.length - 1);
     setAtEnd(reachedEnd);
-    if (reachedEnd && !completeTimerRef.current) {
-      completeTimerRef.current = setTimeout(() => {
-        completeTimerRef.current = null;
-        if (lastSavedIndexRef.current >= paragraphItems.length - 1) {
-          void finishArticle();
-        }
-      }, AUTO_COMPLETE_DELAY);
-    } else if (!reachedEnd && completeTimerRef.current) {
-      clearTimeout(completeTimerRef.current);
-      completeTimerRef.current = null;
-    }
+    /**
+     * 读到末段**直接算读完**(用户决定:不做停留计时,滑到底就是 100%)。
+     * 原来要求"停留在底部 4 秒",既没人知道这条规则,也让人怀疑自己是不是没读进去。
+     */
+    if (reachedEnd) void finishArticle();
   };
 
   const listHeader = (
@@ -365,8 +349,8 @@ export default function ArticleReaderScreen() {
           */}
           <ThemedText type="small" themeColor="textSecondary" style={styles.finishHint}>
             {atEnd
-              ? `已到最后一段 · 停留约 ${Math.round(AUTO_COMPLETE_DELAY / 1000)} 秒自动完成打卡`
-              : `规则:滑到最后一段并停留约 ${Math.round(AUTO_COMPLETE_DELAY / 1000)} 秒算读完;也可以直接点上面的按钮`}
+              ? '已到最后一段 · 已记为读完'
+              : '滑到最后一段即算读完,也可以直接点上面的按钮'}
           </ThemedText>
         </>
       )}

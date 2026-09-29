@@ -68,6 +68,8 @@ export default function TodayScreen() {
   const [learnedTodayCount, setLearnedTodayCount] = useState(0);
   const [dueCount, setDueCount] = useState(0);
   const [wordCount, setWordCount] = useState(0);
+  /** 已掌握(含"我会了")的词数:首页要同时显示"还要学多少"和"已经拿下多少" */
+  const [masteredCount, setMasteredCount] = useState(0);
   const [continueReading, setContinueReading] = useState<{
     article: Article;
     progress: ReadingProgress;
@@ -117,6 +119,7 @@ export default function TodayScreen() {
     setWordCount(
       allWords.filter((w) => w.status !== 'mastered' && w.status !== 'ignored').length,
     );
+    setMasteredCount(allWords.filter((w) => w.status === 'mastered' || w.status === 'ignored').length);
     setStreak(computeStreak(dateKeys));
 
     // 最近读过的一篇(含已读完);若该篇已下架,则继续往前找一篇还在的
@@ -404,8 +407,8 @@ export default function TodayScreen() {
                 onPress={() => router.push('/(tabs)/review')}
               />
               <QuickTile
-                value={String(wordCount)}
-                label="生词本"
+                value={`${wordCount} / ${masteredCount}`}
+                label="生词本 未掌握/已掌握"
                 onPress={() => router.push('/(tabs)/words')}
               />
               <QuickTile
