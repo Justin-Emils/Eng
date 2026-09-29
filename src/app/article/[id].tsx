@@ -34,8 +34,14 @@ import { getUserLevel } from '@/storage/user';
 const MIN_FONT = 16;
 const MAX_FONT = 28;
 const DEFAULT_FONT = 19;
-/** 到达末段后停留多久(ms)自动视为读完 */
-const AUTO_COMPLETE_DELAY = 4000;
+/**
+ * 到达末段后停留多久(ms)自动视为读完。
+ *
+ * 这个规则以前**界面上一个字都没写**,用户只能猜(反馈原话:「像摩斯电码一样让大家猜
+ * 你是怎么想的」)。现在补两处:footer 写清规则;到达末段时给出实时提示。
+ * 时长从 4000 收到 3000:足够避免"划过去就被判读完",也不至于让人干等。
+ */
+const AUTO_COMPLETE_DELAY = 3000;
 
 /**
  * 阅读页(模块 D + M1.2 进度续读 / 打卡):
@@ -61,6 +67,8 @@ export default function ArticleReaderScreen() {
   // 点词时所在句子:收藏生词时记作 sourceSentence,供复习例句/详情使用
   const [pendingSentence, setPendingSentence] = useState<string | undefined>(undefined);
   const [completed, setCompleted] = useState(false);
+  /** 当前是否已滚到最后一段:把"自动完成"的机制显性化(footer 会据此给提示) */
+  const [atEnd, setAtEnd] = useState(false);
   // 是否为"首次渲染后需要恢复滚动位置"(加载完进度前不滚)
   const [restoreIndex, setRestoreIndex] = useState<number | null>(null);
 
@@ -261,8 +269,9 @@ export default function ArticleReaderScreen() {
       lastSavedIndexRef.current = topVisible;
       void saveReadingProgress(article.id, { paragraphIndex: topVisible });
     }
-    // 读到末段:启动自动完成计时
+    // 读到末段:启动自动完成计时,并把"已到末段"暴露给界面
     const reachedEnd = visible.includes(paragraphItems.length - 1);
+    setAtEnd(reachedEnd);
     if (reachedEnd && !completeTimerRef.current) {
       completeTimerRef.current = setTimeout(() => {
         completeTimerRef.current = null;
@@ -339,16 +348,27 @@ export default function ArticleReaderScreen() {
           </View>
         </ThemedView>
       ) : (
-        <Pressable onPress={() => void finishArticle()} style={({ pressed }) => pressed && styles.pressed}>
-          <ThemedView type="backgroundSelected" style={styles.finishBtn}>
-            <View style={styles.finishInner}>
-              {skin.motifs ? <Star size={6} /> : null}
-              <ThemedText type="smallBold" themeColor="accent">
-                {skin.motifs ? '已完成阅读,谢幕' : '已完成阅读,打卡 ✓'}
-              </ThemedText>
-            </View>
-          </ThemedView>
-        </Pressable>
+        <>
+          <Pressable onPress={() => void finishArticle()} style={({ pressed }) => pressed && styles.pressed}>
+            <ThemedView type="backgroundSelected" style={styles.finishBtn}>
+              <View style={styles.finishInner}>
+                {skin.motifs ? <Star size={6} /> : null}
+                <ThemedText type="smallBold" themeColor="accent">
+                  {skin.motifs ? '已完成阅读,谢幕' : '已完成阅读,打卡 ✓'}
+                </ThemedText>
+              </View>
+            </ThemedView>
+          </Pressable>
+          {/*
+            把"自动完成"的规则写出来。原来没有任何提示,于是用户滑到底发现进度没变化,
+            只能猜(反馈:「你最起码标出来吧」)。到达末段时还会切换成实时提示。
+          */}
+          <ThemedText type="small" themeColor="textSecondary" style={styles.finishHint}>
+            {atEnd
+              ? `已到最后一段 · 停留约 ${Math.round(AUTO_COMPLETE_DELAY / 1000)} 秒自动完成打卡`
+              : `规则:滑到最后一段并停留约 ${Math.round(AUTO_COMPLETE_DELAY / 1000)} 秒算读完;也可以直接点上面的按钮`}
+          </ThemedText>
+        </>
       )}
     </View>
   );
@@ -536,6 +556,13 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingVertical: Spacing.two,
+    gap: Spacing.two,
+  },
+  /** 「自动完成」规则的说明文字,居中显示在按钮下方 */
+  finishHint: {
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: Spacing.three,
   },
   finishBtn: {
     alignItems: 'center',

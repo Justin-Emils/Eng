@@ -11,6 +11,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /** 需要备份的存储键(与各 storage 模块保持一致) */
+/**
+ * 备份的键白名单 —— **只放用户数据**。
+ *
+ * 以前这里还包含 readingapp.remote.v1(远程文章缓存),那份内容带着整篇正文,
+ * 一次导出 56 KB,剪贴板根本粘不完整。文章属于「可以重新下载的缓存」,不是用户资产:
+ * 备份里只留进度与生词,换设备后重新拉取即可。
+ */
 export const BACKUP_KEYS = [
   'readingapp.words.v1',
   'readingapp.learning.v1',
@@ -20,7 +27,6 @@ export const BACKUP_KEYS = [
   'readingapp.userlevel.v1',
   'readingapp.settings.v1',
   'readingapp.account.v1',
-  'readingapp.remote.v1',
   'readingapp.corpus.recent-books.v1',
   'readingapp.storage.version',
 ] as const;

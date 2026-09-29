@@ -109,7 +109,14 @@ export default function TodayScreen() {
     setKnown(knownAll);
     setLearnedTodayCount(learnedTodaySet.size);
     setDueCount(dueWords.length);
-    setWordCount(allWords.length);
+    /**
+     * 首页「生词本」计数**只算未掌握的词**。
+     * 以前直接取 allWords.length,于是首页显示 20、点进去发现 20 个全是已掌握。
+     * 已掌握/已忽略的词仍留在生词本里(词汇资产),只是不计入「还要学的量」。
+     */
+    setWordCount(
+      allWords.filter((w) => w.status !== 'mastered' && w.status !== 'ignored').length,
+    );
     setStreak(computeStreak(dateKeys));
 
     // 最近读过的一篇(含已读完);若该篇已下架,则继续往前找一篇还在的

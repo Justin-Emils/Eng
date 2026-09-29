@@ -217,7 +217,7 @@ export function DictCard({
                   <ThemedText
                     type="smallBold"
                     style={{ color: saved ? theme.textSecondary : theme.accent }}>
-                    {saved ? '✓ 已收藏' : '＋ 生词本'}
+                    {saved ? '✓ 已收藏 · 点按移出' : '＋ 生词本'}
                   </ThemedText>
                 </ThemedView>
               </Pressable>

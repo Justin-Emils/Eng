@@ -12,6 +12,7 @@ import { Radii, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/the
 import { getArticleById } from '@/data/articles';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import { countByStatus, getWords } from '@/storage/words';
+import { stageOf, WORD_STAGE_LABEL } from '@/domain/srs';
 import type { WordItem } from '@/types';
 
 /**
@@ -34,7 +35,14 @@ export default function WordsScreen() {
       const load = async () => {
         const [list, counts] = await Promise.all([getWords(), countByStatus()]);
         if (!active) return;
-        setWords(list);
+        /**
+         * 排序:待复习 → 复习中 → 已巩固(已掌握)。
+         * 反馈原话:「这点进来一看生词本 20 个,进去发现 20 个已掌握也太抽象了」——
+         * 已掌握的词仍然留在生词本里(它们是你的词汇资产),但不该占着视线,
+         * 所以排到最后,并且首页计数器只统计未掌握的。
+         */
+        const STAGE_RANK = { pending: 0, reviewing: 1, consolidated: 2 } as const;
+        setWords([...list].sort((a, b) => STAGE_RANK[stageOf(a)] - STAGE_RANK[stageOf(b)]));
         setDueCount(counts.due);
       };
       load().catch(() => {});
@@ -52,7 +60,9 @@ export default function WordsScreen() {
         </ThemedText>
         {words ? (
           <ThemedText type="small" themeColor="textSecondary">
-            共 {words.length} 个生词
+            共 {words.length} 个生词 · 待学{' '}
+            {words.filter((w) => stageOf(w) !== 'consolidated').length} · 已巩固{' '}
+            {words.filter((w) => stageOf(w) === 'consolidated').length}
           </ThemedText>
         ) : null}
       </View>
@@ -121,8 +131,14 @@ function WordRow({
 }) {
   const theme = useTheme();
   const source = item.sourceArticleId ? getArticleById(item.sourceArticleId) : undefined;
-  const mastered = item.status === 'mastered';
-  const statusText = mastered ? '已掌握' : item.status === 'learning' ? '学习中' : '新词';
+  /**
+   * 阶段标签(A2):用 domain/srs 的统一说法(待复习 / 复习中 / 已巩固),
+   * 而不是各页面自己编(以前这里是"新词 / 学习中 / 已掌握",与复习页对不上)。
+   * 已巩固的词用强调色描边,视觉上让它"退到背景里"。
+   */
+  const stage = stageOf(item);
+  const statusText = WORD_STAGE_LABEL[stage];
+  const consolidated = stage === 'consolidated';
 
   return (
     <Pressable onPress={onWordPress} style={({ pressed }) => pressed && styles.rowPressed}>
@@ -138,10 +154,10 @@ function WordRow({
             <ThemedView
               type="backgroundSelected"
               radius="chip"
-              style={[styles.statusChip, mastered && { borderColor: theme.accent }]}>
+              style={[styles.statusChip, consolidated && { borderColor: theme.accent }]}>
               <ThemedText
                 type="small"
-                style={{ color: mastered ? theme.accent : theme.textSecondary }}>
+                style={{ color: consolidated ? theme.accent : theme.textSecondary }}>
                 {statusText}
               </ThemedText>
             </ThemedView>
