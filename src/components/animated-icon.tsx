@@ -1,7 +1,6 @@
-import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useContext, useEffect, useState } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   Keyframe,
@@ -26,14 +25,17 @@ const MIN_SHOW_MS = 1300;
  *
  * 配色全部取自当前主题(背景、幕布轨、标题、加载点),所以换主题时启动屏跟着变。
  *
- * 角色行走动画已按反馈**移除**:素材是"浅色角色 + 纯黑背景"且无色键信息,
- * 抠底调了七版(v1 亮度作 alpha → v6 OpenCV 连通域 → v7 补被包围的纯黑 + 软边),
- * 仍反复出现瑕疵(深色部位被抠、后脑残留黑斑、边缘锯齿),先不折腾。
- * 素材与工具都留在仓库里:assets/anim/walk-transparent.webp;
- * scripts/gen-walk-mask6.py(连通域抠底)/ gen-walk-mask7.py(软边版)/
- * anim-alpha-check.py(把透明区染成洋红做诊断)。
- * 要加回来时,在 styles.content 里放一个 Image 指向该文件即可;
- * 注意它当前**没有被 require**,所以不会打进包(APK 因此约省 1 MB)。
+ * 角色行走动画已按反馈**移除**。原因:素材 `character.webm` 是「浅色角色 + 纯黑背景」,
+ * 而且**没有 alpha 通道、没有色键信息**,只能靠抠底;一共调了七版
+ * (v1 亮度作 alpha → v6 OpenCV 连通域 → v7 补"被包围的纯黑" + 高斯软边),
+ * 仍反复出现瑕疵(角色深色部位被抠、后脑残留黑斑、边缘锯齿),先不折腾。
+ *
+ * 素材与工具都留在仓库里,想恢复时不必重做:
+ *   · `assets/anim/walk-transparent.webp` —— 最新版(v7,218×317,96 帧,1021 KB);
+ *   · `scripts/gen-walk-mask6.py` / `gen-walk-mask7.py` —— 抠底脚本;
+ *   · `scripts/anim-alpha-check.py` —— 诊断工具(把透明区染成洋红,肉眼可查)。
+ * 恢复方法:在 styles.content 里放一个 `Image` 指向该文件即可。
+ * 注意:它当前**没有被 require**,所以不会打进包(APK 因此约省 1 MB)。
  *
  * ⚠️ 与它配套的**原生**启动屏(`app.json` 里 expo-splash-screen 的 backgroundColor)
  * 是构建期常量,**无法跟随运行时主题**,只能对齐到一套配色。那里对齐的是叙拉古主题
@@ -84,7 +86,7 @@ export function AnimatedSplashOverlay({ ready = true }: { ready?: boolean }) {
       />
 
       <View style={styles.content}>
-        {/* 角色行走动画已移除(见组件头注释):这里不再有圆盘与图片 */}
+        {/* 角色行走动画已移除(原因与恢复方式见组件头注释) */}
 
         <ThemedText type="subtitle" style={styles.appName}>
           考研英语阅读
