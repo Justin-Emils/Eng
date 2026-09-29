@@ -10,7 +10,8 @@ import { offlineDictionary } from '@/domain/dictionary';
 import { isExternalWord } from '@/domain/external';
 import { useTheme } from '@/hooks/use-theme';
 import { useWordSaved } from '@/hooks/use-word-saved';
-import { getWords, removeWord } from '@/storage/words';
+import { getWords, removeWord, setWordStatus } from '@/storage/words';
+import { recordReviewResult } from '@/storage/review-stats';
 import type { WordItem } from '@/types';
 
 /**
@@ -52,6 +53,23 @@ export default function WordDetailScreen() {
 
 
 
+  const mastered = wordItem?.status === 'mastered';
+
+  /**
+   * 标为已掌握 / 取消已掌握。
+   *
+   * 这里和复习的判定**共用同一套曲线记账**(recordReviewResult):标记掌握 = 记一笔
+   * "这个词你会",取消 = 把那笔撤销。所以详情页的这个按钮不是"点了就消失",
+   * 它会真正影响知识曲线 —— 这正是反馈要求的「标为已掌握从而影响曲线」。
+   */
+  const handleToggleMastered = async () => {
+    if (!wordItem) return;
+    const nextMastered = !mastered;
+    await setWordStatus(wordItem.id, nextMastered ? 'mastered' : 'learning');
+    await recordReviewResult(wordItem.headword, true, !nextMastered);
+    const list = await getWords();
+    setWordItem(list.find((w) => w.id === wordItem.id) ?? null);
+  };
   /** 从生词本删除(不可恢复,二次确认) */
   const handleRemove = () => {
     if (!wordItem) return;
@@ -210,10 +228,22 @@ export default function WordDetailScreen() {
           </ThemedText>
         ) : null}
 
-        {/* 生词管理(从生词本列表行移到详情页,避免列表里挤两个功能相近的按钮) */}
+        {/*
+          生词管理:标为已掌握 / 从生词本删除。
+          顶部的「已在生词本(点按取消)」已按反馈去掉 —— 收藏与否看上面的按钮即可,
+          这里的两个操作语义不重叠。
+        */}
         {wordItem ? (
           <View style={styles.manageRow}>
-
+            <Pressable
+              onPress={() => void handleToggleMastered()}
+              style={({ pressed }) => [styles.manageBtnWrap, pressed && styles.pressed]}>
+              <ThemedView type="backgroundElement" style={styles.manageBtn}>
+                <ThemedText type="smallBold" themeColor={mastered ? 'textSecondary' : 'accent'}>
+                  {mastered ? '取消已掌握' : '标为已掌握'}
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
             <Pressable
               onPress={handleRemove}
               style={({ pressed }) => [styles.manageBtnWrap, pressed && styles.pressed]}>
@@ -224,6 +254,12 @@ export default function WordDetailScreen() {
               </ThemedView>
             </Pressable>
           </View>
+        ) : null}
+
+        {wordItem ? (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.emptyNote}>
+            标为已掌握会退出常规复习队列,并作为「这个词你会」计入知识曲线(可随时取消)。
+          </ThemedText>
         ) : null}
 
         {params.articleId ? (

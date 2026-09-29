@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -11,8 +11,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Radii, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { getArticleById } from '@/data/articles';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
-import { countByStatus, getWords, removeWord, setWordStatus } from '@/storage/words';
-import { recordReviewResult } from '@/storage/review-stats';
+import { countByStatus, getWords } from '@/storage/words';
 import { stageOf, WORD_STAGE_LABEL } from '@/domain/srs';
 import type { WordItem } from '@/types';
 
@@ -53,48 +52,6 @@ export default function WordsScreen() {
     }, [refresh]),
   );
 
-  /**
-   * 行内操作(长按词条):直接标为已掌握 / 取消 / 删除。
-   *
-   * 为什么要有这个入口:反馈明确要求「生词本中也可以直接将单词标为已掌握从而影响曲线」——
-   * 有些词用户一眼就知道自己会(比如已经在别处学过),没必要走 5 次复习才算掌握。
-   * 而且标记**会写入复习统计**(recordReviewResult),所以它同样参与知识曲线的校准,
-   * 不是"点了就消失"的按钮。
-   */
-  const handleRowLongPress = (item: WordItem) => {
-    const stage = stageOf(item);
-    const consolidated = stage === 'consolidated';
-    Alert.alert(
-      item.headword,
-      consolidated
-        ? '这个词已标记为已掌握(已退出常规复习队列)。'
-        : '标为已掌握后,它会退出常规复习队列,并作为"这个词你会"计入知识曲线。',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: consolidated ? '取消已掌握' : '标为已掌握',
-          onPress: () => {
-            void (async () => {
-              await setWordStatus(item.id, consolidated ? 'learning' : 'mastered');
-              // 曲线记账:标为掌握记一笔"记得";取消则把那笔撤销,账目对齐
-              await recordReviewResult(item.headword, true, consolidated);
-              await refresh();
-            })();
-          },
-        },
-        {
-          text: '从生词本删除',
-          style: 'destructive',
-          onPress: () => {
-            void (async () => {
-              await removeWord(item.id);
-              await refresh();
-            })();
-          },
-        },
-      ],
-    );
-  };
 
   return (
     <ThemedView style={styles.flex}>
@@ -104,7 +61,7 @@ export default function WordsScreen() {
         </ThemedText>
         {words ? (
           <ThemedText type="small" themeColor="textSecondary">
-            长按词条可标为已掌握 / 删除{'\n'}共 {words.length} 个生词 · 待学{' '}
+            共 {words.length} 个生词 · 待学{' '}
             {words.filter((w) => stageOf(w) !== 'consolidated').length} · 已巩固{' '}
             {words.filter((w) => stageOf(w) === 'consolidated').length}
           </ThemedText>
@@ -152,7 +109,6 @@ export default function WordsScreen() {
               onSourcePress={() =>
                 item.sourceArticleId && router.push(`/article/${item.sourceArticleId}`)
               }
-              onLongPress={() => handleRowLongPress(item)}
             />
           )}
           contentContainerStyle={[
@@ -169,13 +125,10 @@ function WordRow({
   item,
   onWordPress,
   onSourcePress,
-  onLongPress,
 }: {
   item: WordItem;
   onWordPress: () => void;
   onSourcePress: () => void;
-  /** 长按:标为已掌握 / 取消 / 删除(见父组件的 handleRowLongPress) */
-  onLongPress: () => void;
 }) {
   const theme = useTheme();
   const source = item.sourceArticleId ? getArticleById(item.sourceArticleId) : undefined;
@@ -189,11 +142,7 @@ function WordRow({
   const consolidated = stage === 'consolidated';
 
   return (
-    <Pressable
-      onPress={onWordPress}
-      onLongPress={onLongPress}
-      delayLongPress={300}
-      style={({ pressed }) => pressed && styles.rowPressed}>
+    <Pressable onPress={onWordPress} style={({ pressed }) => pressed && styles.rowPressed}>
       <ThemedView type="backgroundElement" style={styles.row}>
         <View style={styles.rowHead}>
           <ThemedText type="smallBold" style={styles.wordText}>
