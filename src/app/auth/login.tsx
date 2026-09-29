@@ -7,7 +7,7 @@
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Alert, Pressable, StyleSheet } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
 import { FormField } from '@/components/form-field';
@@ -17,7 +17,8 @@ import { ThemedText } from '@/components/themed-text';
 import { isBackendConfigured } from '@/config/backend';
 import { signIn } from '@/domain/auth/store';
 import { validateEmail, validatePassword } from '@/domain/auth/validate';
-import { autoSyncAfterLogin } from '@/domain/sync';
+import { adoptLocalDataToCurrentAccount, autoSyncAfterLogin, planLoginSync, restoreFromCloud } from '@/domain/sync';
+import { markPulled } from '@/domain/autosync';
 import { useAuth } from '@/hooks/use-auth';
 import { getSettings } from '@/storage/settings';
 
@@ -55,17 +56,95 @@ export default function LoginScreen() {
       await signIn(email, password);
 
       /**
-       * 老用户登录后自动同步一次云端数据(只补不覆盖,见 domain/sync.ts):
-       * 新手机上本机为空 → 直接把进度接上;本机已有数据 → 只合并昵称/头像,不覆盖。
+       * 登录后的同步方向(B2 + 自动同步):
+       *   本机无数据 + 云端有 → 自动恢复;本机有 + 云端无 → 自动上传;
+       *   两边都有 → **必须问用户以哪边为准**(唯一会丢数据的分支,不允许自动决定);
+       *   归属属于另一个账号 → 同样交给用户处理。
+       * 见 domain/sync.ts 的 planLoginSync 与 domain/autosync.ts 的安全边界。
        */
+      const plan = await planLoginSync().catch(() => null);
+
+      const finishNav = (restoredNow: boolean) => {
+        void (async () => {
+          const settings = await getSettings();
+          if (!settings.onboarded) {
+            // 还没建本机学习档案:恢复成功就直接开始用,否则补完引导
+            setTimeout(() => router.replace(restoredNow ? '/(tabs)' : '/onboarding'), 1100);
+            return;
+          }
+          if (fromGate) {
+            setTimeout(() => router.replace('/(tabs)'), 900);
+            return;
+          }
+          setTimeout(goBack, 800);
+        })();
+      };
+
+      if (plan && plan.auto === null) {
+        // 需要用户决策:两条路都会覆盖一边,所以文案必须写清"覆盖的是哪边"
+        setBusy(false);
+        const remoteWhen = plan.remoteUpdatedAt
+          ? new Date(plan.remoteUpdatedAt).toLocaleString()
+          : '时间未知';
+        Alert.alert(
+          '本机与云端都有数据',
+          `${plan.message}\n\n本机:${plan.localWords} 个生词\n云端:${plan.remoteWords} 个生词(更新于 ${remoteWhen})\n\n选择以哪边为准 —— 另一边会被覆盖。`,
+          [
+            {
+              text: '用云端数据覆盖本机',
+              onPress: () => {
+                void (async () => {
+                  try {
+                    const n = await restoreFromCloud({
+                      raw: plan.remoteRaw,
+                      updatedAt: plan.remoteUpdatedAt,
+                      device: '',
+                      wordCount: plan.remoteWords,
+                    });
+                    await markPulled();
+                    setSuccess(`已用云端数据覆盖本机(${n} 项)`);
+                  } catch (e) {
+                    setFailure(`覆盖失败:${e instanceof Error ? e.message : '未知错误'}`);
+                  }
+                  finishNav(true);
+                })();
+              },
+            },
+            {
+              text: '用本机数据覆盖云端',
+              onPress: () => {
+                void (async () => {
+                  try {
+                    await adoptLocalDataToCurrentAccount();
+                    setSuccess('已把本机数据同步到云端');
+                  } catch (e) {
+                    setFailure(`上传失败:${e instanceof Error ? e.message : '未知错误'}`);
+                  }
+                  finishNav(false);
+                })();
+              },
+            },
+            { text: '稍后处理(去账号页)', style: 'cancel', onPress: () => finishNav(false) },
+          ],
+        );
+        return;
+      }
+
+      // 可以自动决定:交给 autoSyncAfterLogin(内部按"本机为空才恢复"处理)
       let note = '';
       let restored = false;
       try {
-        const result = await autoSyncAfterLogin();
-        note = result.note;
-        restored = result.restored;
+        if (plan?.auto === 'upload') {
+          // 本机有数据、云端为空:直接绑定并上传,顺手建立同步基线
+          await adoptLocalDataToCurrentAccount();
+          note = `已把本机的 ${plan.localWords} 个生词同步到云端`;
+        } else {
+          const result = await autoSyncAfterLogin();
+          note = result.note;
+          restored = result.restored;
+        }
       } catch (e) {
-        note = `自动同步失败:${e instanceof Error ? e.message : '未知错误'}(可在账号页手动上传 / 恢复)`;
+        note = `自动同步失败:${e instanceof Error ? e.message : '未知错误'}(可在账号页手动同步)`;
       }
       setSuccess(note);
 

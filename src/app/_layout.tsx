@@ -4,18 +4,21 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { APP_FONTS } from '@/constants/fonts';
 import { hydrateRemoteArticles } from '@/data/articles/remote-registry';
 import { getAuthState, hydrateAuth } from '@/domain/auth/store';
 import { ensureDailyCorpusUpdate } from '@/domain/corpus/update';
+import { maybeAutoSync } from '@/domain/autosync';
 import { autoSyncAfterLogin } from '@/domain/sync';
 import { useResolvedScheme, useTheme } from '@/hooks/use-theme';
 import { hydrateThemePrefs } from '@/hooks/use-theme-pref';
 import { getSettings } from '@/storage/settings';
 import { hydrateLocalOwner } from '@/storage/local-owner';
 import { hydrateReviewStats } from '@/storage/review-stats';
+import { hydrateSyncState } from '@/storage/sync-state';
 import { migrateStorageIfNeeded } from '@/storage/words';
 
 SplashScreen.preventAutoHideAsync();
@@ -59,6 +62,7 @@ export default function RootLayout() {
        */
       await hydrateReviewStats();
       await hydrateLocalOwner();
+      await hydrateSyncState();
       const settings = await getSettings();
       let onboarded = settings.onboarded;
 
@@ -103,6 +107,28 @@ export default function RootLayout() {
     }
   }, [bootChecked, needsOnboarding, authedAtBoot, router]);
 
+  /**
+   * 自动同步(B2):登录并确定方向后,数据自动上云,不再需要用户手动点上传。
+   *
+   * 三个触发点:启动后、回到前台、每 60 秒。
+   * 安全性由 domain/autosync 保证 —— 没有同步基线(还没定方向)时它不会做第一次上传,
+   * 所以这里可以放心地"随手就调"。
+   */
+  useEffect(() => {
+    if (!bootChecked) return;
+    const run = () => {
+      void maybeAutoSync();
+    };
+    run();
+    const timer = setInterval(run, 60_000);
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') run();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, [bootChecked]);
   // 窗口背景跟随主题(主题或深浅色任一变化都要重设,否则切换主题时
   // Android 窗口底会残留上一套主题的底色)
   useEffect(() => {

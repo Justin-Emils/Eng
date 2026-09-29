@@ -16,6 +16,7 @@ import { checkOwnership, type OwnershipCheck } from '@/domain/ownership';
 import { DEFAULT_AVATAR, getAccount, saveAccount } from '@/storage/account';
 import { bindLocalOwner, getLocalOwnerSync } from '@/storage/local-owner';
 import { getSettings } from '@/storage/settings';
+import { hashString, saveSyncState } from '@/storage/sync-state';
 import { getWords } from '@/storage/words';
 
 export interface RemoteBackup {
@@ -168,6 +169,12 @@ export async function pushBackup(): Promise<void> {
       device: 'android',
     },
   });
+  /**
+   * 上传成功即建立**同步基线**(内容指纹 + 时间)。
+   * 自动同步靠它判断"本机从那以后有没有改动";没有基线时自动同步不会做第一次上传
+   * —— 那等于静默决定"以本机为准",必须由用户先定方向(见 domain/autosync)。
+   */
+  await saveSyncState({ lastHash: hashString(raw), lastPushedAt: Date.now() });
 }
 
 /** 读取云端备份(没有则返回 null) */
@@ -207,6 +214,83 @@ export async function adoptLocalDataToCurrentAccount(): Promise<void> {
   const userId = currentUserId();
   await bindLocalOwner({ accountId: userId, email: accountEmail() });
   await pushBackup();
+}
+
+/**
+ * 登录后的同步方案(B2/自动同步):判断"该问用户,还是可以自动决定"。
+ *
+ * 四种情形:
+ *   本机无数据 + 云端有备份 → 自动恢复(新手机首次登录的典型路径)
+ *   本机无数据 + 云端无备份 → 自动绑定(从零开始)
+ *   本机有数据 + 云端无备份 → 自动上传(本机是唯一来源,不存在丢数据的风险)
+ *   本机有数据 + 云端有备份 → **必须问用户**:用哪边?这是唯一会丢数据的分支,
+ *                             不允许自动决定(见 autosync.ts 的首次同步安全边界)
+ *
+ * 归属属于另一个账号时,也一律走"问用户"的分支。
+ */
+export interface LoginSyncPlan {
+  localHasData: boolean;
+  localWords: number;
+  remoteHasBackup: boolean;
+  remoteWords: number;
+  remoteUpdatedAt: string;
+  /** 本机数据的归属与当前账号冲突 */
+  ownershipConflict: boolean;
+  /** 云端备份原文(取用云端时直接用它恢复,避免再请求一次) */
+  remoteRaw: string;
+  /** 无需询问时的自动动作;为 null 表示必须问用户 */
+  auto: 'restore' | 'upload' | 'bind' | null;
+  /** 给用户看的说明 */
+  message: string;
+}
+
+export async function planLoginSync(): Promise<LoginSyncPlan> {
+  const words = await getWords();
+  const localWords = words.length;
+  const localHasData = localWords > 0;
+
+  let remote: RemoteBackup | null = null;
+  try {
+    remote = await pullBackup();
+  } catch {
+    // 云端读失败时按"没有备份"处理:不会因此覆盖任何东西(见下面的分支)
+    remote = null;
+  }
+
+  const ownership = await getOwnershipStatus().catch(() => null);
+  const ownershipConflict = ownership ? !ownership.canUpload : false;
+
+  const base = {
+    localHasData,
+    localWords,
+    remoteHasBackup: Boolean(remote),
+    remoteWords: remote?.wordCount ?? 0,
+    remoteUpdatedAt: remote?.updatedAt ?? '',
+    ownershipConflict,
+    remoteRaw: remote?.raw ?? '',
+  };
+
+  if (ownershipConflict) {
+    return {
+      ...base,
+      auto: null,
+      message: `本机数据属于 ${ownership?.ownerEmail || '另一个账号'}。请选择用哪边的数据,或先去账号页解除归属。`,
+    };
+  }
+  if (!localHasData && base.remoteHasBackup) {
+    return { ...base, auto: 'restore', message: `云端有 ${base.remoteWords} 个生词,本机是空的,将自动恢复` };
+  }
+  if (!localHasData) {
+    return { ...base, auto: 'bind', message: '本机与云端都没有数据,将从零开始' };
+  }
+  if (!base.remoteHasBackup) {
+    return { ...base, auto: 'upload', message: `本机有 ${localWords} 个生词,云端为空,将自动上传` };
+  }
+  return {
+    ...base,
+    auto: null,
+    message: `本机有 ${localWords} 个生词,云端有 ${base.remoteWords} 个 —— 两边都有数据,请选择以哪边为准。`,
+  };
 }
 
 /** 上传昵称 / 头像(登录后个人资料也进云端,换手机才带得走) */

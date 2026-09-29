@@ -15,6 +15,7 @@ import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { isImageAvatar, pickAvatarFromLibrary } from '@/domain/avatar';
 import { signOut } from '@/domain/auth/store';
 import { describeBackup, exportBackup, importBackup } from '@/domain/backup';
+import { describeLastSync } from '@/domain/autosync';
 import { adoptLocalDataToCurrentAccount, getOwnershipStatus, pullBackup, pushBackup, pushProfile, restoreFromCloud } from '@/domain/sync';
 import type { OwnershipCheck } from '@/domain/ownership';
 import { clearLocalOwner } from '@/storage/local-owner';
@@ -541,13 +542,13 @@ export default function AccountScreen() {
                 </>
               ) : null}
               <SettingRow
-                label="上传本机数据到云端"
+                label="立即同步"
                 sublabel={
                   ownership?.state === 'conflict'
-                    ? '当前归属是另一个账号,上传已被阻止(见上行)'
-                    : '把生词本、进度、设置整份推到云端(覆盖云端旧备份)'
+                    ? '当前归属是另一个账号,同步已被阻止(见上行)'
+                    : `${describeLastSync()} · 数据改动后会自动同步,这里只是手动催一次`
                 }
-                value={syncBusy ? '处理中…' : '上传 ›'}
+                value={syncBusy ? '处理中…' : '同步 ›'}
                 onPress={() => {
                   if (!syncBusy) void handleCloudUpload();
                 }}
