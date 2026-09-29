@@ -53,7 +53,7 @@ export function HeadingTranslate({
       </View>
 
       {expanded ? (
-        <ThemedView type="backgroundElement" style={styles.card}>
+        <ThemedView type="backgroundElement" radius="panel" style={styles.card}>
           {loading ? (
             <ThemedText type="small" themeColor="textSecondary">
               翻译中…
@@ -124,7 +124,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.half,
   },
   card: {
-    borderRadius: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     gap: Spacing.two,

@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>P2 纹样样张 — 叙拉古 · 揭幕者们</title>
+<style>
+  :root{
+    --serif: Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+    --sans: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    /* 叙拉古浅色(节目单) */
+    --bg:#F5EFE2; --surface:#FFFCF4; --sel:#EADFC8; --text:#1A1512; --dim:#6B5A47;
+    --accent:#7C1B2B; --accentStr:#6B1220; --onAccent:#F7EEDD; --accentSoft:#F2DED9;
+    --gold:#A8823C; --border:#D8C6A6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0b0a09;font-family:var(--sans);color:#e8e0d2;padding:24px 28px 32px;width:1240px}
+  h1{font-family:var(--serif);font-size:24px;font-weight:600;margin-bottom:4px}
+  .sub{font-size:10.5px;letter-spacing:2.2px;color:#9a8a6c;text-transform:uppercase;margin-bottom:22px}
+  h2{font-family:var(--serif);font-size:15px;font-weight:600;color:#d8cba8;margin:26px 0 12px;
+    padding-bottom:7px;border-bottom:1px solid #2a2621}
+  h2 span{font-family:var(--sans);font-size:10px;letter-spacing:1.6px;color:#7d6f56;font-weight:400;
+    text-transform:uppercase;margin-left:9px}
+  .row{display:flex;gap:14px;align-items:flex-start}
+  .col{display:flex;flex-direction:column;gap:10px}
+
+  /* ---------- 节目单封面 ---------- */
+  .cover{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .cover .orb{position:absolute;border-radius:999px}
+  .cover .frame{position:absolute;border:1px solid;opacity:.75}
+  .cover .tick{position:absolute;opacity:.9}
+  .cover .tick.tl{top:-1px;left:-1px;border-top:1px solid;border-left:1px solid}
+  .cover .tick.br{bottom:-1px;right:-1px;border-bottom:1px solid;border-right:1px solid}
+  .cover .ring{display:flex;align-items:center;justify-content:center;border:1px solid}
+  .cover .dia{transform:rotate(45deg)}
+  .cover .label{position:absolute;display:flex;align-items:center;gap:7px;font-size:10px;
+    letter-spacing:3px;text-transform:uppercase;font-weight:600;font-family:var(--sans)}
+
+  .cap{font-size:9.5px;letter-spacing:1.4px;color:#8a7a5e;text-align:center;text-transform:uppercase}
+
+  /* ---------- 纹样 ---------- */
+  .orn{background:var(--bg);border:1px solid #3a3428;padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+  .ornRow{display:flex;align-items:center;gap:22px}
+  .ornCell{display:flex;flex-direction:column;align-items:center;gap:7px}
+  .ornName{font-size:9px;letter-spacing:1.4px;color:#8a7a5e;text-transform:uppercase}
+
+  .band{height:3px;border-bottom:1px solid var(--gold);display:flex;width:210px}
+  .band i{flex:1;background:var(--accent);display:block}
+
+  .dia7{width:7px;height:7px;background:var(--gold);transform:rotate(45deg)}
+  .dia6{width:6px;height:6px;background:var(--gold);transform:rotate(45deg)}
+  .dia5{width:5px;height:5px;background:var(--gold);transform:rotate(45deg)}
+
+  .seal{display:flex;align-items:center;justify-content:center;border:1px solid var(--gold);
+    background:var(--accentSoft);border-radius:999px;font-family:var(--serif);color:var(--accent);font-weight:600}
+
+  .medallion{border-radius:999px;border:1px solid var(--gold);display:flex;align-items:center;
+    justify-content:center;position:relative;background:transparent}
+  .medallion::before{content:"";position:absolute;inset:2px;border-radius:999px;
+    border:1px solid var(--gold);opacity:.5}
+  .medallion .dia{transform:rotate(45deg);background:var(--gold)}
+
+  /* ---------- 组件片段 ---------- */
+  .chrome{border:1px solid #3a3428;padding:0;width:352px;overflow:hidden;background:var(--bg)}
+  .chipRow{display:flex;align-items:center;gap:8px;border:1px solid var(--gold);
+    border-radius:2px;padding:6px 12px;width:fit-content}
+  .chipRow span{font-size:11.5px;color:var(--accent);font-weight:700}
+  .btnBar{display:flex;align-items:center;justify-content:center;gap:9px;background:var(--sel);
+    border-radius:3px;padding:13px 0}
+  .btnBar span{font-size:12.5px;color:var(--accent);font-weight:700}
+  .emptyState{display:flex;flex-direction:column;align-items:center;gap:9px;padding:22px 18px}
+  .emptyState .t{font-size:13px;font-weight:700;color:var(--text)}
+  .emptyState .d{font-size:11.5px;color:var(--dim);text-align:center;max-width:250px;line-height:1.55}
+  .emptyState .b{margin-top:6px;background:var(--accentStr);color:var(--onAccent);
+    padding:9px 22px;border-radius:3px;font-size:12.5px;font-weight:700}
+  .feat{display:flex;align-items:center;gap:14px}
+  .feat .mk{width:20px;display:flex;justify-content:center}
+  .feat span{font-size:12.5px;color:var(--dim)}
+  .toolbar{display:flex;align-items:center;gap:10px;padding:9px 14px}
+  .toolbar .bk{font-family:var(--serif);font-size:22px;color:var(--accent);line-height:1}
+  .toolbar .ttl{flex:1;font-size:10.5px;color:var(--dim)}
+  .toolbar .fb{border:1px solid var(--border);border-radius:2px;padding:3px 7px;font-size:9.5px;font-weight:700;color:var(--text)}
+</style>
+</head>
+<body>
+
+<h1>P2 纹样样张</h1>
+<div class="sub">siracusa theme · motifs only</div>
+
+<h2>程序化「节目单」封面 <span>zero network · deterministic from article id</span></h2>
+<div class="row">
+
+  <!-- hero 300x180, pad14 mark52 tick12 -->
+  <div class="col">
+    <div class="cover" style="width:300px;height:180px;background:#3E0F1B">
+      <div class="orb" style="width:177px;height:177px;background:#7C1B2B;right:-47px;top:-57px;opacity:.9"></div>
+      <div class="orb" style="width:114px;height:114px;background:#7C1B2B;left:-42px;bottom:-47px;opacity:.55"></div>
+      <div class="frame" style="inset:14px;border-color:#F2E4D0">
+        <div class="tick tl" style="width:12px;height:12px;border-color:#F2E4D0"></div>
+        <div class="tick br" style="width:12px;height:12px;border-color:#F2E4D0"></div>
+      </div>
+      <div class="ring" style="width:52px;height:52px;border-radius:999px;border-color:#F2E4D0">
+        <div class="dia" style="width:14px;height:14px;background:#F2E4D0"></div>
+      </div>
+      <div class="label" style="left:22px;bottom:22px;color:#F2E4D0">
+        <div class="dia5" style="width:5px;height:5px;background:#F2E4D0"></div>科技
+      </div>
+    </div>
+    <div class="cap">hero 180px</div>
+  </div>
+
+  <!-- 六个丝绒预设 banner 200x88, pad8 mark24 tick7 -->
+  <div class="col">
+    <div class="row">
+      <div class="col">
+        <div class="cover" style="width:200px;height:88px;background:#3E0F1B">
+          <div class="orb" style="width:82px;height:82px;background:#7C1B2B;right:-22px;top:-26px;opacity:.9"></div>
+          <div class="orb" style="width:53px;height:53px;background:#7C1B2B;left:-19px;bottom:-22px;opacity:.55"></div>
+          <div class="frame" style="inset:8px;border-color:#F2E4D0"><div class="tick tl" style="width:7px;height:7px;border-color:#F2E4D0"></div><div class="tick br" style="width:7px;height:7px;border-color:#F2E4D0"></div></div>
+          <div class="dia" style="width:7px;height:7px;background:#F2E4D0;transform:rotate(45deg)"></div>
+        </div>
+        <div class="cap">酒红(家族)</div>
+      </div>
+      <div class="col">
+        <div class="cover" style="width:200px;height:88px;background:#101C18">
+          <div class="orb" style="width:82px;height:82px;background:#2F4A3C;right:-22px;top:-26px;opacity:.9"></div>
+          <div class="orb" style="width:53px;height:53px;background:#2F4A3C;left:-19px;bottom:-22px;opacity:.55"></div>
+          <div class="frame" style="inset:8px;border-color:#EDE6D2"><div class="tick tl" style="width:7px;height:7px;border-color:#EDE6D2"></div><div class="tick br" style="width:7px;height:7px;border-color:#EDE6D2"></div></div>
+          <div class="dia" style="width:7px;height:7px;background:#EDE6D2;transform:rotate(45deg)"></div>
+        </div>
+        <div class="cap">墨绿(庄园)</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <div class="cover" style="width:200px;height:88px;background:#101827">
+          <div class="orb" style="width:82px;height:82px;background:#2C4468;right:-22px;top:-26px;opacity:.9"></div>
+          <div class="orb" style="width:53px;height:53px;background:#2C4468;left:-19px;bottom:-22px;opacity:.55"></div>
+          <div class="frame" style="inset:8px;border-color:#E6E3D8"><div class="tick tl" style="width:7px;height:7px;border-color:#E6E3D8"></div><div class="tick br" style="width:7px;height:7px;border-color:#E6E3D8"></div></div>
+          <div class="dia" style="width:7px;height:7px;background:#E6E3D8;transform:rotate(45deg)"></div>
+        </div>
+        <div class="cap">午夜蓝(夜场)</div>
+      </div>
+      <div class="col">
+        <div class="cover" style="width:200px;height:88px;background:#26180F">
+          <div class="orb" style="width:82px;height:82px;background:#6B4423;right:-22px;top:-26px;opacity:.9"></div>
+          <div class="orb" style="width:53px;height:53px;background:#6B4423;left:-19px;bottom:-22px;opacity:.55"></div>
+          <div class="frame" style="inset:8px;border-color:#F0E6D2"><div class="tick tl" style="width:7px;height:7px;border-color:#F0E6D2"></div><div class="tick br" style="width:7px;height:7px;border-color:#F0E6D2"></div></div>
+          <div class="dia" style="width:7px;height:7px;background:#F0E6D2;transform:rotate(45deg)"></div>
+        </div>
+        <div class="cap">赭石(羊皮)</div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="col">
+        <div class="cover" style="width:200px;height:88px;background:#1F1224">
+          <div class="orb" style="width:82px;height:82px;background:#4E2A56;right:-22px;top:-26px;opacity:.9"></div>
+          <div class="orb" style="width:53px;height:53px;background:#4E2A56;left:-19px;bottom:-22px;opacity:.55"></div>
+          <div class="frame" style="inset:8px;border-color:#EBE4D6"><div class="tick tl" style="width:7px;height:7px;border-color:#EBE4D6"></div><div class="tick br" style="width:7px;height:7px;border-color:#EBE4D6"></div></div>
+          <div class="dia" style="width:7px;height:7px;background:#EBE4D6;transform:rotate(45deg)"></div>
+        </div>
+        <div class="cap">紫檀(剧院)</div>
+      </div>
+      <div class="col">
+        <div class="cover" style="width:200px;height:88px;background:#191716">
+          <div class="orb" style="width:82px;height:82px;background:#3E3A34;right:-22px;top:-26px;opacity:.9"></div>
+          <div class="orb" style="width:53px;height:53px;background:#3E3A34;left:-19px;bottom:-22px;opacity:.55"></div>
+          <div class="frame" style="inset:8px;border-color:#EDE7DA"><div class="tick tl" style="width:7px;height:7px;border-color:#EDE7DA"></div><div class="tick br" style="width:7px;height:7px;border-color:#EDE7DA"></div></div>
+          <div class="dia" style="width:7px;height:7px;background:#EDE7DA;transform:rotate(45deg)"></div>
+        </div>
+        <div class="cap">炭黑(幕间)</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 缩略图 -->
+  <div class="col">
+    <div class="cover" style="width:80px;height:80px;background:#3E0F1B">
+      <div class="orb" style="width:68px;height:68px;background:#7C1B2B;right:-18px;top:-22px;opacity:.9"></div>
+      <div class="frame" style="inset:6px;border-color:#F2E4D0"><div class="tick tl" style="width:6px;height:6px;border-color:#F2E4D0"></div><div class="tick br" style="width:6px;height:6px;border-color:#F2E4D0"></div></div>
+      <div class="dia" style="width:6px;height:6px;background:#F2E4D0;transform:rotate(45deg)"></div>
+    </div>
+    <div class="cap">thumb 80px</div>
+    <div class="cover" style="width:56px;height:56px;background:#101C18">
+      <div class="orb" style="width:56px;height:56px;background:#2F4A3C;right:-15px;top:-18px;opacity:.9"></div>
+      <div class="frame" style="inset:5px;border-color:#EDE6D2"></div>
+      <div class="dia" style="width:5px;height:5px;background:#EDE6D2;transform:rotate(45deg)"></div>
+    </div>
+    <div class="cap">56px(推荐卡)</div>
+  </div>
+</div>
+
+<h2>纹样 <span>none of these render when motifs = false</span></h2>
+<div class="row">
+  <div class="orn" style="flex:1">
+    <div class="ornRow">
+      <div class="ornCell"><div class="band"><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i></div><div class="ornName">CurtainBand 幕布轨</div></div>
+      <div class="ornCell"><div class="dia7"></div><div class="ornName">Diamond 7</div></div>
+      <div class="ornCell"><div class="dia6"></div><div class="ornName">6</div></div>
+      <div class="ornCell"><div class="dia5"></div><div class="ornName">5</div></div>
+      <div class="ornCell"><div class="seal" style="width:22px;height:22px;font-size:11px">✓</div><div class="ornName">Seal 22</div></div>
+      <div class="ornCell"><div class="seal" style="width:34px;height:34px;font-size:15px">12</div><div class="ornName">Seal 34</div></div>
+      <div class="ornCell"><div class="medallion" style="width:44px;height:44px"><div class="dia" style="width:11px;height:11px"></div></div><div class="ornName">Medallion 44</div></div>
+      <div class="ornCell"><div class="medallion" style="width:64px;height:64px"><div class="dia" style="width:17px;height:17px"></div></div><div class="ornName">Medallion 64</div></div>
+    </div>
+  </div>
+</div>
+
+<h2>落到界面里 <span>same components, real text</span></h2>
+<div class="row">
+
+  <div class="col">
+    <div class="chrome">
+      <div class="toolbar">
+        <span class="bk">‹</span><span class="ttl">The Rise of the Carnival</span>
+        <span class="fb">A−</span><span class="fb">A+</span>
+      </div>
+      <div class="band" style="width:100%;border-bottom:1px solid var(--gold)"><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i><i></i><i style="opacity:.62"></i></div>
+      <div style="padding:16px 16px 20px">
+        <div class="btnBar"><div class="dia6"></div><span>已完成阅读,谢幕</span></div>
+      </div>
+    </div>
+    <div class="cap">阅读页:幕布轨 + 谢幕按钮</div>
+  </div>
+
+  <div class="col">
+    <div class="chrome">
+      <div style="padding:14px 16px 0">
+        <div class="chipRow"><div class="dia6"></div><span>连续 12 天</span></div>
+      </div>
+      <div style="padding:12px 16px 16px;font-size:11.5px;color:var(--dim);line-height:1.6">
+        首页打卡徽章:金线描边 + 金色菱形,替换原来的 🔥 emoji
+      </div>
+    </div>
+    <div class="cap">首页:连续打卡徽章</div>
+  </div>
+
+  <div class="col">
+    <div class="chrome">
+      <div class="emptyState">
+        <div class="medallion" style="width:64px;height:64px"><div class="dia" style="width:17px;height:17px"></div></div>
+        <div class="t">文章都读完了</div>
+        <div class="d">公版短文每天自动更新,也可以去文章库挑一篇新的</div>
+        <div class="b">去文章库</div>
+      </div>
+    </div>
+    <div class="cap">空状态:勋章替换 emoji</div>
+  </div>
+
+  <div class="col">
+    <div class="chrome">
+      <div style="padding:18px 18px 6px;display:flex;flex-direction:column;gap:12px">
+        <div class="feat"><div class="mk"><div class="dia7"></div></div><span>按你的词汇量推荐文章</span></div>
+        <div class="feat"><div class="mk"><div class="dia7"></div></div><span>超出水平的生词自动标蓝</span></div>
+        <div class="feat"><div class="mk"><div class="dia7"></div></div><span>生词按遗忘曲线排期复习</span></div>
+        <div class="feat"><div class="mk"><div class="dia7"></div></div><span>登录后换手机不丢进度</span></div>
+      </div>
+      <div style="padding:6px 18px 18px;font-size:11.5px;color:var(--dim);line-height:1.6">
+        欢迎页卖点列表:金色菱形替换 🎯🔵🔁☁️
+      </div>
+    </div>
+    <div class="cap">欢迎页:卖点列表</div>
+  </div>
+
+</div>
+
+</body>
+</html>

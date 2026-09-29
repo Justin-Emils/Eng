@@ -1,9 +1,11 @@
 /**
  * 用户设置持久化(模块 F / G)。
- * 默认:每天读 1 篇 + 复习 10 词(需求 G 三默认值);主题跟随系统。
+ * 默认:每天读 1 篇 + 复习 10 词(需求 G 三默认值);主题用默认主题 + 跟随系统。
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { DEFAULT_THEME_ID, isThemeId, type ThemeId } from '@/constants/theme';
 
 export interface DailyGoal {
   /** 每日待读篇数 */
@@ -24,6 +26,8 @@ interface SettingsStore {
   dailyGoal: DailyGoal;
   /** 主题模式(默认跟随系统) */
   theme: ThemeMode;
+  /** 主题(配色方案)id,如 default / siracusa —— 与深浅模式互相独立 */
+  themeId: ThemeId;
   /** 是否已完成首次引导 */
   onboarded: boolean;
   /** 本地昵称(无账号体系,纯本地展示) */
@@ -33,11 +37,20 @@ interface SettingsStore {
 const DEFAULTS: SettingsStore = {
   dailyGoal: DEFAULT_DAILY_GOAL,
   theme: DEFAULT_THEME_MODE,
+  themeId: DEFAULT_THEME_ID,
   onboarded: false,
 };
 
 function normalizeTheme(value: unknown): ThemeMode {
   return value === 'light' || value === 'dark' || value === 'system' ? value : DEFAULT_THEME_MODE;
+}
+
+/**
+ * 主题 id 兜底:存储里可能留着已下线主题的旧值(或被人手工改坏),
+ * 这里统一退回默认主题,避免 UI 拿到不存在的配色。
+ */
+function normalizeThemeId(value: unknown): ThemeId {
+  return isThemeId(value) ? value : DEFAULT_THEME_ID;
 }
 
 /** 读取设置(含默认值) */
@@ -49,6 +62,7 @@ export async function getSettings(): Promise<SettingsStore> {
     return {
       dailyGoal: { ...DEFAULT_DAILY_GOAL, ...(parsed.dailyGoal ?? {}) },
       theme: normalizeTheme(parsed.theme),
+      themeId: normalizeThemeId(parsed.themeId),
       onboarded: parsed.onboarded === true,
       nickname: typeof parsed.nickname === 'string' ? parsed.nickname : undefined,
     };
@@ -71,6 +85,11 @@ export async function saveDailyGoal(goal: DailyGoal): Promise<void> {
 /** 更新主题模式 */
 export async function saveThemeMode(theme: ThemeMode): Promise<void> {
   await patch({ theme });
+}
+
+/** 更新主题(配色方案) */
+export async function saveThemeId(themeId: ThemeId): Promise<void> {
+  await patch({ themeId });
 }
 
 /** 标记首次引导已完成 */

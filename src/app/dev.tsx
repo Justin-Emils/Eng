@@ -18,7 +18,7 @@ import { StatusNote } from '@/components/status-note';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { isBackendConfigured } from '@/config/backend';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { signOut } from '@/domain/auth/store';
 import { pullBackup } from '@/domain/sync';
 import { useAuth } from '@/hooks/use-auth';
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
   },
   intro: { lineHeight: 20 },
   sectionTitle: { marginTop: Spacing.two, marginLeft: Spacing.one },
-  list: { borderRadius: Spacing.three, paddingHorizontal: Spacing.three },
-  card: { borderRadius: Spacing.three, padding: Spacing.three },
+  list: { borderRadius: Radii.card, paddingHorizontal: Spacing.three },
+  card: { borderRadius: Radii.card, padding: Spacing.three },
   cardText: { lineHeight: 20 },
 });

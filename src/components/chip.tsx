@@ -7,12 +7,14 @@ import { useTheme } from '@/hooks/use-theme';
 
 /**
  * 小徽章:文章库 / 阅读页 里展示 CEFR 等级等标签。
+ * 形状交给主题:默认主题是胶囊,叙拉古是方直角(印刷品的标签语言)。
  */
 export function Chip({ children, style }: { children: string; style?: ViewStyle }) {
   const theme = useTheme();
   return (
     <ThemedView
       type="backgroundSelected"
+      radius="chip"
       style={[styles.chip, { borderColor: theme.border }, style]}>
       <ThemedText type="smallBold" themeColor="textSecondary" style={styles.chipText}>
         {children}
@@ -36,8 +38,7 @@ const styles = StyleSheet.create({
   chip: {
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.half,
-    borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
   },
   chipText: {
     fontSize: 12,

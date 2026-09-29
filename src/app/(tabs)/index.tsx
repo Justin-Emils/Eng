@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArticleCover } from '@/components/article-cover';
 import { EmptyState } from '@/components/empty-state';
+import { Enter } from '@/components/motion';
+import { Star } from '@/components/ornaments';
 import { RecommendCard } from '@/components/recommend-card';
 import { SkeletonList } from '@/components/skeleton';
 import { ThemedText } from '@/components/themed-text';
@@ -17,10 +19,10 @@ import { recommendFor } from '@/domain/recommend';
 import { curveForLevel } from '@/domain/knowledge';
 import { computeStreak } from '@/domain/stats';
 import { useCompletedArticleIds } from '@/hooks/use-completed-articles';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import { getCheckinDateKeys, getCheckedArticleIdsOn, todayKey } from '@/storage/checkins';
 import { getAllKnown, getAllLearned, getLearnedToday } from '@/storage/learning';
-import { getInProgressArticles } from '@/storage/progress';
+import { getRecentReadingProgress } from '@/storage/progress';
 import { getSettings } from '@/storage/settings';
 import { DEFAULT_USER_LEVEL, getUserLevel } from '@/storage/user';
 import { getDueWords, getWords } from '@/storage/words';
@@ -53,6 +55,7 @@ function todayLabel(now = new Date()): string {
 export default function TodayScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const skin = useThemeSkin();
   const router = useRouter();
   const completedIds = useCompletedArticleIds();
 
@@ -84,7 +87,7 @@ export default function TodayScreen() {
       dueWords,
       allWords,
       dateKeys,
-      inProgress,
+      recentReading,
     ] = await Promise.all([
       getCheckedArticleIdsOn(todayKey()),
       getSettings(),
@@ -95,7 +98,7 @@ export default function TodayScreen() {
       getDueWords(),
       getWords(),
       getCheckinDateKeys(),
-      getInProgressArticles(),
+      getRecentReadingProgress(),
     ]);
 
     setNickname(settings.nickname ?? '');
@@ -109,8 +112,8 @@ export default function TodayScreen() {
     setWordCount(allWords.length);
     setStreak(computeStreak(dateKeys));
 
-    // 最近在读、且文章还在的一篇
-    const first = inProgress.find((p) => getArticleById(p.articleId));
+    // 最近读过的一篇(含已读完);若该篇已下架,则继续往前找一篇还在的
+    const first = recentReading.find((p) => getArticleById(p.articleId));
     const article = first ? getArticleById(first.articleId) : undefined;
     setContinueReading(first && article ? { article, progress: first } : null);
   }, []);
@@ -167,16 +170,23 @@ export default function TodayScreen() {
     goalArticles > 0 ? Math.min(100, Math.round((todayRead / goalArticles) * 100)) : 0;
   const remaining = Math.max(0, goalArticles - todayRead);
 
-  const continuePercent = continueReading
-    ? Math.min(
-        95,
-        Math.round(
-          ((continueReading.progress.paragraphIndex + 1) /
-            Math.max(1, continueReading.article.paragraphs.length)) *
-            100,
-        ),
-      )
-    : 0;
+  /**
+   * 继续阅读进度:
+   * - 已读完 → 100%(读完后这张卡仍指向刚读完的那篇,进度不能被"回退"到别的文章);
+   * - 未读完 → 已到达段数占比,上限 99%(既然没读完就不该显示 100%)。
+   */
+  const continuePercent = !continueReading
+    ? 0
+    : continueReading.progress.completed
+      ? 100
+      : Math.min(
+          99,
+          Math.round(
+            ((continueReading.progress.paragraphIndex + 1) /
+              Math.max(1, continueReading.article.paragraphs.length)) *
+              100,
+          ),
+        );
 
   return (
     <ThemedView style={styles.flex}>
@@ -203,15 +213,21 @@ export default function TodayScreen() {
               {greeting()}
               {nickname ? `,${nickname}` : ''}
             </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
+            <ThemedText type="label" themeColor="textSecondary">
               {todayLabel()}
             </ThemedText>
           </View>
           {streak > 0 ? (
-            <ThemedView type="backgroundSelected" style={styles.streakBadge}>
-              <ThemedText type="smallBold" themeColor="accent">
-                🔥 连续 {streak} 天
-              </ThemedText>
+            <ThemedView
+              type="backgroundSelected"
+              radius="chip"
+              style={[styles.streakBadge, { borderColor: theme.gold }]}>
+              <View style={styles.streakInner}>
+                {skin.motifs ? <Star size={6} /> : null}
+                <ThemedText type="smallBold" themeColor="accent">
+                  {skin.motifs ? `连续 ${streak} 天` : `🔥 连续 ${streak} 天`}
+                </ThemedText>
+              </View>
             </ThemedView>
           ) : null}
         </View>
@@ -225,7 +241,7 @@ export default function TodayScreen() {
               <ThemedText type="smallBold" themeColor="accent">
                 先花 1 分钟做个水平评估 →
               </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.bannerSub}>
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.bannerSub}>
                 评估后按「比你高 1 档」推荐;现在按 {bandLabelOf(userVocab)} 估计
               </ThemedText>
             </ThemedView>
@@ -237,49 +253,69 @@ export default function TodayScreen() {
         ) : (
           <>
             {/* 今日目标 */}
-            <ThemedView type="backgroundElement" style={styles.card}>
+            <Enter step={0}>
+            <ThemedView type="backgroundElement" frame="playbill" style={styles.card}>
               <View style={styles.cardHead}>
-                <ThemedText type="smallBold">今日目标</ThemedText>
+                <ThemedText type="label" themeColor="textSecondary">
+                  今日目标
+                </ThemedText>
                 <ThemedText type="smallBold" themeColor="accent">
                   {todayRead} / {goalArticles} 篇
                 </ThemedText>
               </View>
               <View style={styles.statRow}>
                 <View style={styles.stat}>
-                  <ThemedText style={styles.statNum}>{learnedTodayCount}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
+                  <ThemedText type="numeric">{learnedTodayCount}</ThemedText>
+                  <ThemedText type="caption" themeColor="textSecondary">
                     今日新学词
                   </ThemedText>
                 </View>
                 <View style={styles.stat}>
-                  <ThemedText style={styles.statNum}>{dueCount}</ThemedText>
-                  <ThemedText type="small" themeColor="textSecondary">
+                  <ThemedText type="numeric">{dueCount}</ThemedText>
+                  <ThemedText type="caption" themeColor="textSecondary">
                     待复习
                   </ThemedText>
                 </View>
                 <View style={styles.statProgress}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {remaining > 0 ? `还差 ${remaining} 篇完成目标` : '🎉 今日目标已达成'}
-                  </ThemedText>
-                  <View style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
+                  <View style={styles.goalRow}>
+                    {skin.motifs && remaining === 0 ? <Star size={5} /> : null}
+                    <ThemedText type="caption" themeColor="textSecondary">
+                      {remaining > 0
+                        ? `还差 ${remaining} 篇完成目标`
+                        : skin.motifs
+                          ? '今日目标已达成'
+                          : '🎉 今日目标已达成'}
+                    </ThemedText>
+                  </View>
+                  <View
+                    style={[
+                      styles.track,
+                      { borderRadius: skin.radiusChip, backgroundColor: theme.backgroundSelected },
+                    ]}>
                     <View
                       style={[
                         styles.fill,
-                        { width: `${goalPercent}%`, backgroundColor: theme.accent },
+                        {
+                          width: `${goalPercent}%`,
+                          borderRadius: skin.radiusChip,
+                          backgroundColor: theme.accent,
+                        },
                       ]}
                     />
                   </View>
                 </View>
               </View>
             </ThemedView>
+            </Enter>
 
             {/* 继续阅读 */}
             {continueReading ? (
+              <Enter step={1}>
               <Pressable
                 onPress={() => router.push(`/article/${continueReading.article.id}`)}
                 style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedView type="backgroundElement" style={styles.card}>
-                  <ThemedText type="smallBold" style={styles.cardHead2}>
+                <ThemedView type="backgroundElement" frame="playbill" style={styles.card}>
+                  <ThemedText type="label" themeColor="textSecondary" style={styles.cardHead2}>
                     继续阅读
                   </ThemedText>
                   <View style={styles.continueRow}>
@@ -287,17 +323,25 @@ export default function TodayScreen() {
                       <ArticleCover article={continueReading.article} size="thumb" />
                     </View>
                     <View style={styles.continueBody}>
-                      <ThemedText type="smallBold" numberOfLines={2} style={styles.continueTitle}>
+                      <ThemedText type="heading" numberOfLines={2}>
                         {continueReading.article.title}
                       </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
+                      <ThemedText type="caption" themeColor="textSecondary">
                         已读 {continuePercent}% · 约 {continueReading.article.difficulty.minutes} 分钟
                       </ThemedText>
-                      <View style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
+                      <View
+                    style={[
+                      styles.track,
+                      { borderRadius: skin.radiusChip, backgroundColor: theme.backgroundSelected },
+                    ]}>
                         <View
                           style={[
                             styles.fill,
-                            { width: `${continuePercent}%`, backgroundColor: theme.accent },
+                            {
+                              width: `${continuePercent}%`,
+                              borderRadius: skin.radiusChip,
+                              backgroundColor: theme.accent,
+                            },
                           ]}
                         />
                       </View>
@@ -305,13 +349,14 @@ export default function TodayScreen() {
                   </View>
                 </ThemedView>
               </Pressable>
+              </Enter>
             ) : null}
 
             {/* 为你挑选 */}
             <View style={styles.sectionHead}>
-              <ThemedText type="smallBold">为你挑选</ThemedText>
+              <ThemedText type="heading">为你挑选</ThemedText>
               <Pressable onPress={() => router.push('/(tabs)/library')}>
-                <ThemedText type="small" themeColor="textSecondary">
+                <ThemedText type="caption" themeColor="textSecondary">
                   按你的 {userVocab} 词 · 查看更多 ›
                 </ThemedText>
               </Pressable>
@@ -326,7 +371,8 @@ export default function TodayScreen() {
                 onAction={() => router.push('/(tabs)/library')}
               />
             ) : (
-              picks.map((p) => (
+              picks.map((p, i) => (
+                <Enter key={p.article.id} step={2 + i}>
                 <RecommendCard
                   key={p.article.id}
                   data={{
@@ -339,6 +385,7 @@ export default function TodayScreen() {
                     sampleNewWords: p.sampleNewWords,
                   }}
                 />
+                </Enter>
               ))
             )}
 
@@ -381,8 +428,8 @@ function QuickTile({
       onPress={onPress}
       style={({ pressed }) => [styles.quickTileWrap, pressed && styles.pressed]}>
       <ThemedView type="backgroundElement" style={styles.quickTile}>
-        <ThemedText style={styles.quickValue}>{value}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
+        <ThemedText type="heading">{value}</ThemedText>
+        <ThemedText type="caption" themeColor="textSecondary">
           {label}
         </ThemedText>
       </ThemedView>
@@ -405,22 +452,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.three,
   },
-  greetText: { flex: 1, gap: 2 },
+  greetText: { flex: 1, gap: Spacing.one },
   greet: { fontSize: 24, lineHeight: 32 },
   streakBadge: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one + 2,
-    borderRadius: 999,
+    borderWidth: 1,
   },
+  streakInner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
+  goalRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one + 2 },
   assessBanner: {
     padding: Spacing.three,
-    borderRadius: Spacing.three,
     gap: Spacing.half,
   },
   bannerSub: { lineHeight: 18 },
   card: {
     padding: Spacing.three,
-    borderRadius: Spacing.three,
     gap: Spacing.two,
   },
   cardHead: {
@@ -431,14 +478,12 @@ const styles = StyleSheet.create({
   cardHead2: { marginBottom: Spacing.half },
   statRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.four },
   stat: { gap: 1 },
-  statNum: { fontSize: 24, fontWeight: '800', lineHeight: 30 },
   statProgress: { flex: 1, gap: Spacing.one, paddingBottom: 2 },
-  track: { height: 8, borderRadius: 999, overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 999 },
+  track: { height: 6, overflow: 'hidden' },
+  fill: { height: '100%' },
   continueRow: { flexDirection: 'row', gap: Spacing.three, alignItems: 'center' },
   continueCover: { width: 72 },
   continueBody: { flex: 1, gap: Spacing.one },
-  continueTitle: { fontSize: 14.5, lineHeight: 20 },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -448,11 +493,9 @@ const styles = StyleSheet.create({
   quickRow: { flexDirection: 'row', gap: Spacing.two + 2, marginTop: Spacing.one },
   quickTileWrap: { flex: 1 },
   quickTile: {
-    borderRadius: Spacing.three,
     paddingVertical: Spacing.three,
     alignItems: 'center',
     gap: 2,
   },
-  quickValue: { fontSize: 18, fontWeight: '800' },
   pressed: { opacity: 0.85 },
 });

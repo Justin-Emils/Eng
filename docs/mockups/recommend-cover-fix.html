@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>为你挑选 · 封面宽度修复对照</title>
+<style>
+  :root{
+    --serif: Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+    --sans: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    /* 叙拉古浅色 */
+    --bg:#F5EFE2; --surface:#FFFCF4; --text:#1A1512; --dim:#6B5A47;
+    --accent:#7C1B2B; --accentSoft:#F2DED9; --gold:#A8823C; --border:#D8C6A6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0b0a09;font-family:var(--sans);color:#e8e0d2;padding:24px 28px 30px;width:1020px}
+  h1{font-family:var(--serif);font-size:21px;font-weight:600;margin-bottom:4px}
+  .sub{font-size:10.5px;letter-spacing:2px;color:#9a8a6c;text-transform:uppercase;margin-bottom:20px}
+  h2{font-size:12px;font-weight:600;color:#d8cba8;margin:22px 0 10px;padding-bottom:6px;
+     border-bottom:1px solid #2a2621;letter-spacing:.6px}
+  .note{font-size:11px;color:#8a7a5e;line-height:1.7;margin-bottom:10px}
+  .bad{color:#e0a0a0}
+  .good{color:#a8c890}
+
+  /* 真实的卡片宽度 = 屏宽 390 - 左右各 24 */
+  .card{width:342px;background:var(--surface);border:1px solid var(--border);border-radius:3px;
+    display:flex;align-items:center;gap:16px;padding:10px;position:relative}
+  .card::before,.card::after{content:"";position:absolute;width:9px;height:9px;border:1px solid var(--gold)}
+  .card::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+  .card::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+  .cover{width:60px;height:80px;position:relative;overflow:hidden;flex:0 0 auto;border-radius:2px;
+    display:flex;align-items:center;justify-content:center}
+  .blk{position:absolute}
+  .fr{position:absolute;border:1px solid;opacity:.7}
+  .frLayer{position:absolute}
+  .tk{position:absolute;opacity:.9}
+  .tk.tl{top:-1px;left:-1px;border-top:1px solid;border-left:1px solid}
+  .tk.br{bottom:-1px;right:-1px;border-bottom:1px solid;border-right:1px solid}
+  .body{flex:1;display:flex;flex-direction:column;gap:4px}
+  .title{font-family:var(--serif);font-size:15px;line-height:21px;font-weight:600;color:var(--text)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:11px;line-height:16px;color:var(--accent);background:var(--accentSoft);
+    border:1px solid var(--gold);border-radius:2px;padding:1px 8px}
+  .why{font-size:11.5px;line-height:16px;color:var(--dim);display:flex;align-items:center;gap:6px}
+  .dia{width:5px;height:5px;background:var(--gold);transform:rotate(45deg);flex:0 0 auto}
+  .arrow{font-size:18px;color:var(--dim)}
+  .rowWrap{display:flex;gap:26px;align-items:flex-start}
+  .stack{display:flex;flex-direction:column;gap:10px}
+  .cap{font-size:9.5px;letter-spacing:1.3px;color:#8a7a5e;text-transform:uppercase}
+
+  /* 坏例:封面没有固定宽度,被内容压成窄条 */
+  .coverBad{height:80px;position:relative;overflow:hidden;flex:0 0 auto;border-radius:2px;
+    display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+
+<h1>「为你挑选」封面宽度 · 修复对照</h1>
+<div class="sub">recommend card · 342px card · 60×80 cover</div>
+
+<div class="note">
+  卡片是 <b>行布局</b>（<code>flex-direction: row</code>）。行布局里子元素的主轴尺寸由<b>内容</b>决定，
+  而封面自身只给了高度、没给宽度 —— 于是宽度退化成"内部唯一有固有宽度的元素"的宽度。
+</div>
+
+<div class="rowWrap">
+
+  <div class="stack">
+    <h2 class="bad">修复前 · 宽度塌成中央徽记那么宽</h2>
+    <div class="card">
+      <div class="coverBad" style="width:6px;background:#301e12">
+        <div style="width:8px;height:8px;background:#ebe4e0;transform:rotate(45deg)"></div>
+      </div>
+      <div class="body">
+        <div class="title">Sicily's Lemon Groves</div>
+        <div class="chips"><span class="chip">认识约 92.4%</span><span class="chip">新词 7</span></div>
+        <div class="why"><span class="dia"></span>刚好合适 · B1 约 2600 词</div>
+      </div>
+      <span class="arrow">›</span>
+    </div>
+    <div class="cap">菱形徽记 → 封面只有 6px 宽</div>
+
+    <div class="card">
+      <div class="coverBad" style="width:20px;background:#382a15">
+        <div style="position:relative;width:10px;height:10px">
+          <div style="position:absolute;top:4px;left:0;width:10px;height:1px;background:#ebe7e0"></div>
+          <div style="position:absolute;left:4px;top:0;width:1px;height:10px;background:#ebe7e0"></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="title">A Quiet Crisis in Science</div>
+        <div class="chips"><span class="chip">认识约 88.1%</span><span class="chip">新词 11</span></div>
+        <div class="why"><span class="dia"></span>略有挑战 · B2 约 4000 词</div>
+      </div>
+      <span class="arrow">›</span>
+    </div>
+    <div class="cap">圆环/横线徽记 → 封面 20px 宽（每张还不一样）</div>
+  </div>
+
+  <div class="stack">
+    <h2 class="good">修复后 · 固定 60×80（海报比例）</h2>
+
+    <!-- id0: base#301e12 block#74462a soft#1f180f ink#ebe4e0 layout3 mark bars frame2 j.096 -->
+    <div class="card">
+      <div class="cover" style="background:#301e12">
+        <div class="blk" style="background:#74462a;width:57px;height:57px;border-radius:28px;right:-27px;top:-37px"></div>
+        <div class="blk" style="background:#1f180f;height:15px;left:0;right:38%;top:40%"></div>
+        <div class="fr" style="inset:8px;border-color:#ebe4e0"></div>
+        <div class="fr" style="inset:12px;border-color:#ebe4e0;opacity:.35"></div>
+        <div class="tk tl" style="width:7px;height:7px;border-color:#ebe4e0"></div>
+        <div class="tk br" style="width:7px;height:7px;border-color:#ebe4e0"></div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
+          <div style="width:26px;height:2px;background:#ebe4e0"></div>
+          <div style="width:17px;height:2px;background:#ebe4e0"></div>
+          <div style="width:9px;height:2px;background:#ebe4e0"></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="title">Sicily's Lemon Groves</div>
+        <div class="chips"><span class="chip">认识约 92.4%</span><span class="chip">新词 7</span><span class="chip">5 分钟</span></div>
+        <div class="why"><span class="dia"></span>刚好合适 · B1 约 2600 词 · 新词 grove / terrace</div>
+      </div>
+      <span class="arrow">›</span>
+    </div>
+
+    <!-- id1: base#382a15 block#836534 soft#221f11 ink#ebe7e0 layout2 mark cross frame1 j.516 -->
+    <div class="card">
+      <div class="cover" style="background:#382a15">
+        <div class="blk" style="background:#221f11;height:36%;left:0;right:0;bottom:0"></div>
+        <div class="blk" style="background:#836534;width:76px;height:76px;border-radius:38px;right:-32px;top:-27px"></div>
+        <div class="frLayer" style="inset:8px">
+          <div class="tk tl" style="width:7px;height:7px;border-color:#ebe7e0"></div>
+          <div class="tk br" style="width:7px;height:7px;border-color:#ebe7e0"></div>
+        </div>
+        <div style="position:relative;width:13px;height:13px">
+          <div style="position:absolute;top:6px;left:0;width:13px;height:2px;background:#ebe7e0"></div>
+          <div style="position:absolute;left:6px;top:0;width:2px;height:13px;background:#ebe7e0"></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="title">The Quiet Crisis in Scientific Research</div>
+        <div class="chips"><span class="chip">认识约 88.1%</span><span class="chip">新词 11</span><span class="chip">8 分钟</span></div>
+        <div class="why"><span class="dia"></span>略有挑战 · B2 约 4000 词</div>
+      </div>
+      <span class="arrow">›</span>
+    </div>
+
+    <!-- id2: base#37162e block#6d2c5c soft#29141f ink#ebe0e8 layout1 mark bars frame1 j.978 -->
+    <div class="card">
+      <div class="cover" style="background:#37162e">
+        <div class="blk" style="background:#6d2c5c;width:32%;top:0;bottom:0;left:0"></div>
+        <div class="blk" style="background:#29141f;width:74px;height:74px;border-radius:37px;right:-31px;bottom:-37px"></div>
+        <div class="frLayer" style="inset:8px">
+          <div class="tk tl" style="width:7px;height:7px;border-color:#ebe0e8"></div>
+          <div class="tk br" style="width:7px;height:7px;border-color:#ebe0e8"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center">
+          <div style="width:26px;height:2px;background:#ebe0e8"></div>
+          <div style="width:17px;height:2px;background:#ebe0e8"></div>
+          <div style="width:9px;height:2px;background:#ebe0e8"></div>
+        </div>
+      </div>
+      <div class="body">
+        <div class="title">The Story of Afternoon Tea</div>
+        <div class="chips"><span class="chip">认识约 86.1%</span><span class="chip">新词 3</span><span class="chip">4 分钟</span></div>
+        <div class="why"><span class="dia"></span>刚好合适 · B2 约 4000 词 · 新词 scone</div>
+      </div>
+      <span class="arrow">›</span>
+    </div>
+
+    <div class="cap">三张封面的宽度完全一致(60px),内部差异只来自生成器的四个维度</div>
+  </div>
+
+</div>
+
+<div class="note" style="margin-top:18px">
+  另外两处用到缩略封面但<b>不受影响</b>:「最新短文」条是<b>列布局</b>（卡片本身 <code>width: CARD_WIDTH</code>，
+  封面靠 <code>stretch</code> 撑满）；首页「继续阅读」已经有一层 <code>width: 72</code> 的包裹层。
+</div>
+
+</body>
+</html>

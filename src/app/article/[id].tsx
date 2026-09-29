@@ -13,17 +13,19 @@ import { ArticleCover } from '@/components/article-cover';
 import { ChipRow } from '@/components/chip';
 import { DictCard } from '@/components/dict-card';
 import { HeadingTranslate } from '@/components/heading-translate';
+import { CurtainBand, Star } from '@/components/ornaments';
 import { SentenceBlock } from '@/components/sentence-block';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Fonts, Spacing } from '@/constants/theme';
+import { READING_MEASURE } from '@/constants/typography';
 import { getArticleById } from '@/data/articles';
 import { offlineDictionary, type LookupResult } from '@/domain/dictionary';
 import { CEFR_REPRESENTATIVE_VOCAB } from '@/domain/levels';
 import { difficultyOf } from '@/domain/difficulty';
 import { splitSentences, extractWords } from '@/domain/wordmark';
 import { isStudyCandidate } from '@/domain/wordlevel';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import { addCheckin } from '@/storage/checkins';
 import { getAllKnown, getAllLearned, getLearnedToday, markKnown, markLearned } from '@/storage/learning';
 import { getReadingProgress, markArticleCompleted, saveReadingProgress } from '@/storage/progress';
@@ -47,6 +49,7 @@ export default function ArticleReaderScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const skin = useThemeSkin();
   const { id } = useLocalSearchParams<{ id: string }>();
   const article = id ? getArticleById(id) : undefined;
 
@@ -206,9 +209,15 @@ export default function ArticleReaderScreen() {
 
   const d = article.difficulty;
   const diff = difficultyOf(article);
+  /*
+   * 「需词汇量」与「N 词」是两个不同的轴,标签必须分开:
+   * 前者是读懂本文所需的词汇量(4600),后者是本文实际长度(460)。
+   * 旧写法把前者写成「约 4600 词」并紧挨着「约 N 分钟」,会被读成
+   * "这篇 4600 词只要几分钟",即一分钟上千词。
+   */
   const meta = [
     `难度 ${diff.band.id}`,
-    `约 ${diff.requiredVocab} 词`,
+    `需词汇量 ${diff.requiredVocab}`,
     `${d.wordCount} 词`,
     `约 ${d.minutes} 分钟`,
   ];
@@ -277,14 +286,20 @@ export default function ArticleReaderScreen() {
           {article.title}
         </ThemedText>
         {completed ? (
-          <ThemedView type="backgroundSelected" style={styles.doneChip}>
+          <ThemedView type="backgroundSelected" radius="chip" style={styles.doneChip}>
             <ThemedText type="smallBold" themeColor="accent">
               ✓ 已读完本篇
             </ThemedText>
           </ThemedView>
         ) : null}
         {article.summary ? (
-          <ThemedText themeColor="textSecondary" style={styles.summary}>
+          <ThemedText
+            themeColor="textSecondary"
+            style={[
+              styles.summary,
+              // 中文简介跟正文用同一套字形:叙拉古是衬线,默认主题是无衬线(原样)
+              { fontFamily: skin.bodyFont === 'serif' ? Fonts.serif : Fonts.sans },
+            ]}>
             {article.summary}
           </ThemedText>
         ) : null}
@@ -296,8 +311,17 @@ export default function ArticleReaderScreen() {
             来源:{article.credit}
           </ThemedText>
         ) : null}
+        {/* 图例直接用**当前主题的标注色**渲染,而不是写"蓝=…"
+            —— 叙拉古主题下标注是批注红/聚光金,写死颜色名会说错 */}
         <ThemedText type="small" themeColor="textSecondary" style={styles.tapHint}>
-          蓝=按你词汇量该学的生词 · 蓝粗=今日新学 · 点词可查义/标记学习
+          <ThemedText type="small" themeColor="annotate">
+            标色
+          </ThemedText>
+          =按你词汇量该学的生词 ·
+          <ThemedText type="small" themeColor="annotateStrong" style={styles.tapHintStrong}>
+            加粗
+          </ThemedText>
+          =今日新学 · 点词可查义/标记学习
         </ThemedText>
       </View>
     </View>
@@ -307,23 +331,30 @@ export default function ArticleReaderScreen() {
     <View style={styles.footer}>
       {completed ? (
         <ThemedView type="backgroundSelected" style={styles.finishBtn}>
-          <ThemedText type="smallBold" themeColor="accent">
-            ✓ 已完成 · 已记录今日打卡
-          </ThemedText>
+          <View style={styles.finishInner}>
+            {skin.motifs ? <Star size={6} /> : null}
+            <ThemedText type="smallBold" themeColor="accent">
+              {skin.motifs ? '已完成 · 已记录今日打卡' : '✓ 已完成 · 已记录今日打卡'}
+            </ThemedText>
+          </View>
         </ThemedView>
       ) : (
         <Pressable onPress={() => void finishArticle()} style={({ pressed }) => pressed && styles.pressed}>
           <ThemedView type="backgroundSelected" style={styles.finishBtn}>
-            <ThemedText type="smallBold" themeColor="accent">
-              已完成阅读,打卡 ✓
-            </ThemedText>
+            <View style={styles.finishInner}>
+              {skin.motifs ? <Star size={6} /> : null}
+              <ThemedText type="smallBold" themeColor="accent">
+                {skin.motifs ? '已完成阅读,谢幕' : '已完成阅读,打卡 ✓'}
+              </ThemedText>
+            </View>
           </ThemedView>
         </Pressable>
       )}
     </View>
   );
 
-  const lineHeight = Math.round(fontSize * 1.7);
+  /** 正文行高倍数由主题给:衬线比无衬线需要更多呼吸(skin.bodyLineHeight) */
+  const lineHeight = Math.round(fontSize * skin.bodyLineHeight);
 
   return (
     <ThemedView style={styles.flex}>
@@ -343,16 +374,27 @@ export default function ArticleReaderScreen() {
         <View style={styles.fontControls}>
           <Pressable
             onPress={() => setFontSize((s) => Math.max(MIN_FONT, s - 1))}
-            style={({ pressed }) => [styles.fontBtn, pressed && { opacity: 0.5 }]}>
+            style={({ pressed }) => [
+              styles.fontBtn,
+              { borderRadius: skin.radiusPanel },
+              pressed && { opacity: 0.5 },
+            ]}>
             <ThemedText type="smallBold">A−</ThemedText>
           </Pressable>
           <Pressable
             onPress={() => setFontSize((s) => Math.min(MAX_FONT, s + 1))}
-            style={({ pressed }) => [styles.fontBtn, pressed && { opacity: 0.5 }]}>
+            style={({ pressed }) => [
+              styles.fontBtn,
+              { borderRadius: skin.radiusPanel },
+              pressed && { opacity: 0.5 },
+            ]}>
             <ThemedText type="smallBold">A+</ThemedText>
           </Pressable>
         </View>
       </View>
+
+      {/* 幕布轨:工具条与正文之间的装饰横带。只有主题启用纹样时才渲染 */}
+      <CurtainBand />
 
       <FlatList
         ref={listRef}
@@ -442,12 +484,16 @@ const styles = StyleSheet.create({
   fontBtn: {
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.one,
-    borderRadius: Spacing.two,
   },
   listContent: {
     alignSelf: 'center',
     width: '100%',
-    maxWidth: MaxContentWidth,
+    /**
+     * 阅读页用**行宽上限**而不是全局的 MaxContentWidth(800):
+     * 一行 60~75 个字符最好读,800dp 上 18px 衬线接近 90 个字符,回扫时容易串行。
+     * 见 constants/typography.ts 的 READING_MEASURE。
+     */
+    maxWidth: READING_MEASURE,
     paddingHorizontal: Spacing.four,
   },
   header: {
@@ -465,17 +511,21 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
-    borderRadius: 999,
   },
   title: {
     fontSize: 26,
-    lineHeight: 34,
+    lineHeight: 36,
   },
   summary: {
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 26,
   },
   tapHint: {
     lineHeight: 20,
+  },
+  /** 图例里「加粗」那两个字要真的加粗,否则和「标色」看不出区别 */
+  tapHintStrong: {
+    fontWeight: '700',
   },
   credit: {
     lineHeight: 16,
@@ -490,7 +540,11 @@ const styles = StyleSheet.create({
   finishBtn: {
     alignItems: 'center',
     paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
+  },
+  finishInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   pressed: {
     opacity: 0.6,

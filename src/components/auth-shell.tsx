@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export function AuthShell({
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   },
   subtitle: { lineHeight: 20 },
   card: {
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     padding: Spacing.three,
     gap: Spacing.three,
     marginTop: Spacing.two,

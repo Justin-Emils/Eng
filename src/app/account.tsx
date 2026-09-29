@@ -11,13 +11,13 @@ import { StatusNote } from '@/components/status-note';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { isBackendConfigured } from '@/config/backend';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { isImageAvatar, pickAvatarFromLibrary } from '@/domain/avatar';
 import { signOut } from '@/domain/auth/store';
 import { describeBackup, exportBackup, importBackup } from '@/domain/backup';
 import { pullBackup, pushBackup, pushProfile, restoreFromCloud } from '@/domain/sync';
 import { useAuth } from '@/hooks/use-auth';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import {
   AVATAR_CHOICES,
   DEFAULT_AVATAR,
@@ -64,6 +64,7 @@ export default function AccountScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const skin = useThemeSkin();
   const auth = useAuth();
 
   const [account, setAccount] = useState<AccountInfo | null>(null);
@@ -380,6 +381,7 @@ export default function AccountScreen() {
               returnKeyType="done"
               style={[
                 styles.input,
+                { borderRadius: skin.radiusCard },
                 {
                   color: theme.text,
                   backgroundColor: theme.background,
@@ -540,7 +542,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
   },
-  card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two },
+  card: { borderRadius: Radii.card, padding: Spacing.three, gap: Spacing.two },
   identityRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   identityBody: { flex: 1, gap: 2 },
   nickname: { fontSize: 16 },
@@ -568,6 +570,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   sectionTitle: { marginTop: Spacing.two, marginLeft: Spacing.one },
-  list: { borderRadius: Spacing.three, paddingHorizontal: Spacing.three },
+  list: { borderRadius: Radii.card, paddingHorizontal: Spacing.three },
   note: { lineHeight: 20, paddingHorizontal: Spacing.one },
 });

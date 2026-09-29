@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { offlineDictionary } from '@/domain/dictionary';
 import { isExternalWord } from '@/domain/external';
 import { useTheme } from '@/hooks/use-theme';
@@ -124,7 +124,7 @@ export default function WordDetailScreen() {
           {entry ? (
             <>
               {isExternalWord(rawWord) ? (
-                <ThemedView type="backgroundSelected" style={styles.flagBadge}>
+                <ThemedView type="backgroundSelected" radius="chip" style={styles.flagBadge}>
                   <ThemedText type="smallBold" themeColor="accent">
                     考研词表收录
                   </ThemedText>
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
-    borderRadius: 999,
+    borderRadius: Radii.sharp,
   },
   titleCol: {
     flexShrink: 1,
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.two,
   },
   notice: {
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     padding: Spacing.three,
   },
   divider: {
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   exampleBox: {
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     padding: Spacing.three,
     marginTop: Spacing.one,
   },
@@ -356,12 +356,12 @@ const styles = StyleSheet.create({
   saveBtn: {
     alignItems: 'center',
     paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
   },
   sourceBtn: {
     alignItems: 'center',
     paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
   },
   pressed: {
     opacity: 0.6,

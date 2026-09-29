@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>排版层：行宽 / 层级 / 字距对照</title>
+<style>
+  :root{
+    --serif: Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+    --sans: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    /* 叙拉古·浅色(实测) */
+    --bg:#F4F1F8; --surface:#FFFFFF; --text:#0D0B16; --dim:#5B5270;
+    --accent:#3A329B; --annotate:#A8297A; --annotateStr:#7E1A5B; --gold:#A8722E; --border:#D5CFE4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0b0a09;font-family:var(--sans);color:#e8e0d2;padding:24px 26px 30px;width:1400px}
+  h1{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:3px}
+  .sub{font-size:10px;letter-spacing:2px;color:#9a8a6c;text-transform:uppercase;margin-bottom:18px}
+  h2{font-size:12px;font-weight:600;color:#d8cba8;margin:22px 0 10px;padding-bottom:6px;
+     border-bottom:1px solid #2a2621;letter-spacing:.5px}
+  h2 em{font-style:normal;font-size:10px;letter-spacing:1.4px;color:#7d6f56;margin-left:8px}
+  .row{display:flex;gap:22px;align-items:flex-start}
+  .col{display:flex;flex-direction:column;gap:8px}
+
+  .page{background:var(--bg);padding:22px 24px;border-radius:3px}
+  .para{font-family:var(--serif);font-size:18px;line-height:1.8;color:var(--text);letter-spacing:0}
+  .para b{color:var(--annotate);font-weight:400}
+  .para u{color:var(--annotateStr);font-weight:700;text-decoration:none}
+  .w800{width:800px}
+  .w600{width:600px}
+  .meta{font-family:var(--sans);font-size:11px;color:var(--dim);letter-spacing:.2px;line-height:1.45}
+  .badge{display:inline-block;font-family:var(--sans);font-size:10px;font-weight:700;
+    letter-spacing:1.6px;text-transform:uppercase;padding:3px 8px;border:1px solid;border-radius:2px}
+  .bad{color:#c86a6a;border-color:#c86a6a}
+  .good{color:#8fb878;border-color:#8fb878}
+  .cap{font-size:9.5px;letter-spacing:1.3px;color:#8a7a5e;text-transform:uppercase;text-align:center}
+
+  /* 层级梯 */
+  .ladder{background:var(--bg);border-radius:3px;padding:20px 24px;width:660px;
+    display:flex;flex-direction:column;gap:14px}
+  .ladder .line{display:flex;align-items:baseline;gap:14px}
+  .ladder .tag{font-family:var(--sans);font-size:9px;letter-spacing:1.2px;color:var(--dim);
+    width:96px;flex:0 0 auto;text-transform:uppercase}
+  .t-display{font-family:var(--serif);font-size:34px;line-height:39px;font-weight:600;letter-spacing:-0.7px;color:var(--text)}
+  .t-title{font-family:var(--serif);font-size:26px;line-height:32px;font-weight:600;letter-spacing:-0.5px;color:var(--text)}
+  .t-heading{font-family:var(--serif);font-size:19px;line-height:26px;font-weight:600;letter-spacing:-0.2px;color:var(--text)}
+  .t-body{font-family:var(--sans);font-size:16px;line-height:24px;font-weight:500;letter-spacing:0;color:var(--text)}
+  .t-small{font-family:var(--sans);font-size:14px;line-height:20px;font-weight:500;letter-spacing:0.1px;color:var(--text)}
+  .t-caption{font-family:var(--sans);font-size:12px;line-height:17px;font-weight:500;letter-spacing:0.2px;color:var(--dim)}
+  .t-label{font-family:var(--sans);font-size:10px;line-height:14px;font-weight:600;letter-spacing:1.8px;
+    text-transform:uppercase;color:var(--dim)}
+  .t-numeric{font-family:var(--serif);font-size:26px;line-height:30px;font-weight:600;letter-spacing:-0.3px;
+    font-variant-numeric:tabular-nums;color:var(--text)}
+  .numrow{display:flex;gap:26px;align-items:baseline}
+  .note{font-size:11px;color:#8a7a5e;line-height:1.7}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:10.5px;color:#b8a888}
+</style>
+</head>
+<body>
+
+<h1>排版层：行宽 / 层级 / 字距</h1>
+<div class="sub">typography layer · measure 800 → 600 · tabular numerals</div>
+
+<h2>行宽对照 <em>同一段文字，同样的 18px 衬线</em></h2>
+<div class="row">
+  <div class="col">
+    <div><span class="badge bad">旧 · maxWidth 800</span></div>
+    <div class="page w800">
+      <p class="para">The festival began with a single <b>float</b> rolling down the narrow street, past balconies draped in cloth the colour of <u>amber</u>, and the whole town leaned over the rails to watch.</p>
+    </div>
+    <div class="meta">一行约 <b>88 个字符</b> —— 眼睛从行尾回扫到下一行开头要跨过整个屏宽，容易串行。</div>
+  </div>
+
+  <div class="col">
+    <div><span class="badge good">新 · READING_MEASURE 600</span></div>
+    <div class="page w600">
+      <p class="para">The festival began with a single <b>float</b> rolling down the narrow street, past balconies draped in cloth the colour of <u>amber</u>, and the whole town leaned over the rails to watch.</p>
+    </div>
+    <div class="meta">一行约 <b>66 个字符</b> —— 落在 60–75 的舒适区间内，回扫距离短。</div>
+  </div>
+</div>
+
+<h2>层级梯 <em>字号越大字距越紧，字越小字距越松</em></h2>
+<div class="row">
+  <div class="ladder">
+    <div class="line"><span class="tag">display 34</span><span class="t-display">揭幕者们</span></div>
+    <div class="line"><span class="tag">title 26</span><span class="t-title">The Rise of the Carnival</span></div>
+    <div class="line"><span class="tag">heading 19</span><span class="t-heading">Sicily's Lemon Groves</span></div>
+    <div class="line"><span class="tag">body 16</span><span class="t-body">按你的词汇量推荐文章</span></div>
+    <div class="line"><span class="tag">small 14</span><span class="t-small">已读 45% · 约 6 分钟</span></div>
+    <div class="line"><span class="tag">caption 12</span><span class="t-caption">来源：Project Gutenberg 公版书籍</span></div>
+    <div class="line"><span class="tag">label 10</span><span class="t-label">[ 今日目标 ]</span></div>
+    <div class="line"><span class="tag">numeric 26</span>
+      <span class="numrow">
+        <span class="t-numeric">37</span>
+        <span class="t-numeric">128</span>
+        <span class="t-numeric">2,600</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="col" style="max-width:600px">
+    <div class="note">
+      <b>字距不是全局一个值。</b> 34px 的标题用 0 字距会显得松散，10px 的全大写标签用 0 字距会粘成一团。
+      所以每一档都带自己的 <code>tracking</code>：display −0.7 / title −0.5 / heading −0.2 /
+      body 0 / small +0.1 / caption +0.2 / label <b>+1.8</b>。
+    </div>
+    <div class="note">
+      <b>行距按倍数给，不是写死行高。</b> 衬线正文 1.62~1.80，标签类只要 1.40 ——
+      差别很大，用一个固定行高会两头都不对。阅读正文的行高倍数仍由主题给（默认主题 1.7 / 叙拉古 1.8）。
+    </div>
+    <div class="note">
+      <b>数字用等宽数位。</b> 统计数字会变（<code>37 → 128</code>），比例数位会让它左右跳动；
+      <code>font-variant-numeric: tabular-nums</code> 才不会。上排三个数字宽度一致。
+    </div>
+    <div class="note" style="color:#c8a0a0">
+      <b>字体族现在全是系统回退。</b> 内嵌自有显示字体需要装包，本环境网络与 npm 都被拦。
+      代码里已经留好插槽（<code>constants/typography.ts</code> 的 <code>FONT_SLOTS</code>），
+      装好之后改四个字符串即可，其余不用动。
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -6,8 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import { getAccount, saveAccount } from '@/storage/account';
 import { saveDailyGoal, saveOnboarded } from '@/storage/settings';
 
@@ -24,6 +24,7 @@ import { saveDailyGoal, saveOnboarded } from '@/storage/settings';
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const skin = useThemeSkin();
   const router = useRouter();
   const params = useLocalSearchParams<{ step?: string }>();
 
@@ -114,6 +115,7 @@ export default function OnboardingScreen() {
                 placeholderTextColor={theme.textSecondary}
                 style={[
                   styles.input,
+                  { borderRadius: skin.radiusCard },
                   {
                     color: theme.text,
                     backgroundColor: theme.backgroundElement,
@@ -260,7 +262,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, lineHeight: 32 },
   desc: { lineHeight: 20 },
   card: {
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     padding: Spacing.three,
     gap: Spacing.three,
   },

@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ArticleCover } from '@/components/article-cover';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { difficultyOf } from '@/domain/difficulty';
 import type { Article } from '@/types';
 
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.9 },
   card: {
     width: CARD_WIDTH,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     overflow: 'hidden',
   },
   cardBody: {

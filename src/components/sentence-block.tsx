@@ -83,7 +83,7 @@ export const SentenceBlock = memo(function SentenceBlock({
       </View>
 
       {expanded ? (
-        <ThemedView type="backgroundElement" style={styles.translation}>
+        <ThemedView type="backgroundElement" radius="panel" style={styles.translation}>
           {result ? (
             <>
               <ThemedText type="smallBold" themeColor="accent" style={styles.tag}>
@@ -122,7 +122,6 @@ const styles = StyleSheet.create({
     marginTop: Spacing.half,
   },
   translation: {
-    borderRadius: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     gap: Spacing.half,

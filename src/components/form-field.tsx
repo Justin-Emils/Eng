@@ -3,7 +3,7 @@
  *
  * 几个刻意的细节:
  * - 密码框带「显示/隐藏」,自用 App 里输错密码看不到最恼人;
- * - 错误文字用深/浅色分别调过的红,保证深色模式下也读得清;
+ * - 错误文字用主题的 danger 令牌,每套主题的深浅色都各自保证 ≥4.5 对比度;
  * - 输入框高度 48、圆角与 PrimaryButton 一致,视觉上成对。
  */
 
@@ -12,7 +12,7 @@ import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'rea
 
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import { useResolvedScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 
 export function FormField({
   label,
@@ -47,10 +47,10 @@ export function FormField({
   onSubmitEditing?: () => void;
 }) {
   const theme = useTheme();
-  const scheme = useResolvedScheme();
+  const skin = useThemeSkin();
   const [revealed, setRevealed] = useState(false);
 
-  const danger = scheme === 'dark' ? '#FF8A80' : '#C62828';
+  const danger = theme.danger;
 
   return (
     <View style={styles.wrap}>
@@ -76,6 +76,8 @@ export function FormField({
           style={[
             styles.input,
             {
+              // 与 PrimaryButton 用同一个控件圆角,视觉上成对(由主题决定胶囊还是方直角)
+              borderRadius: skin.radiusCard,
               color: theme.text,
               backgroundColor: theme.background,
               borderColor: error ? danger : theme.border,
@@ -115,7 +117,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     borderWidth: 1,
-    borderRadius: Spacing.three,
     paddingHorizontal: Spacing.three,
     fontSize: 15,
   },

@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>配色对照：实测 vs 旧 vs 新</title>
+<style>
+  :root{
+    --serif: Georgia, "Times New Roman", "Songti SC", "SimSun", serif;
+    --sans: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0b0a09;font-family:var(--sans);color:#e8e0d2;padding:24px 26px 32px;width:1280px}
+  h1{font-family:var(--serif);font-size:22px;font-weight:600;margin-bottom:3px}
+  .sub{font-size:10px;letter-spacing:2px;color:#9a8a6c;text-transform:uppercase;margin-bottom:20px}
+  h2{font-size:12px;font-weight:600;color:#d8cba8;margin:24px 0 10px;padding-bottom:6px;
+     border-bottom:1px solid #2a2621;letter-spacing:.5px}
+  h2 em{font-style:normal;font-family:var(--sans);font-size:10px;letter-spacing:1.4px;color:#7d6f56;margin-left:8px}
+  .row{display:flex;gap:16px;align-items:flex-start}
+  .stack{display:flex;flex-direction:column;gap:9px}
+
+  /* 色板组 */
+  .group{display:flex;flex-direction:column;gap:5px}
+  .gname{font-size:9px;letter-spacing:1.6px;color:#7d6f56;text-transform:uppercase}
+  .sw{display:flex;gap:5px}
+  .sw i{width:64px;height:40px;border-radius:2px;display:flex;align-items:flex-end;justify-content:center;
+    padding-bottom:3px;font-size:8px;letter-spacing:.4px;font-style:normal;font-family:var(--sans)}
+  .sw i.dk{color:rgba(255,255,255,.72)}
+  .sw i.lt{color:rgba(0,0,0,.62)}
+
+  /* 映射表 */
+  table{border-collapse:collapse;font-size:11.5px;width:100%}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid #221f1c}
+  th{font-size:9px;letter-spacing:1.4px;color:#7d6f56;text-transform:uppercase;font-weight:500}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:ui-monospace,Consolas,monospace;font-size:10.5px}
+  .dot{width:12px;height:12px;border-radius:2px;display:inline-block}
+  .old{color:#8a7a6a;text-decoration:line-through;text-decoration-color:#6a4a4a}
+  .bad{color:#d98888}
+  .good{color:#9dc08b}
+
+  /* 新配色下的组件预览 */
+  .ui{background:#0B0912;border:1px solid #2E2842;border-radius:3px;padding:14px;width:300px;
+      display:flex;flex-direction:column;gap:11px;position:relative}
+  .ui::before,.ui::after{content:"";position:absolute;width:9px;height:9px;border:1px solid #D8A05D}
+  .ui::before{top:-1px;left:-1px;border-right:0;border-bottom:0}
+  .ui::after{bottom:-1px;right:-1px;border-left:0;border-top:0}
+  .ui .card{background:#1A1725;border:1px solid #2E2842;border-radius:3px;padding:11px;display:flex;
+    flex-direction:column;gap:8px}
+  .ui .lbl{font-size:9px;letter-spacing:1.8px;color:#A99CC0;text-transform:uppercase}
+  .ui .num{font-family:var(--serif);font-size:24px;font-weight:600;color:#F5F2FA;line-height:1}
+  .ui .cap{font-size:10.5px;color:#A99CC0;margin-top:3px}
+  .ui .btn{background:#8F88F2;color:#12101F;text-align:center;padding:11px;border-radius:2px;
+    font-size:12.5px;font-weight:700;position:relative}
+  .ui .btn::after{content:"";position:absolute;inset:3px;border:1px solid #12101F;opacity:.4;border-radius:2px}
+  .ui .track{height:6px;background:#272041;border-radius:2px;position:relative;overflow:hidden}
+  .ui .fill{position:absolute;inset:0;width:52%;background:#8F88F2;border-radius:2px}
+  .ui .sentence{font-family:var(--serif);font-size:13px;line-height:1.8;color:#F5F2FA}
+  .ui .sentence b{color:#E0607A;font-weight:400}
+  .ui .sentence u{color:#F08499;font-weight:700;text-decoration:none}
+  .ui .tag{display:inline-flex;align-self:flex-start;border:1px solid #D8A05D;border-radius:2px;
+    padding:4px 10px;font-size:10.5px;font-weight:700;color:#8F88F2;background:#252047}
+
+  .note{font-size:11px;color:#8a7a5e;line-height:1.75;margin-top:10px}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:10.5px;color:#b8a888}
+</style>
+</head>
+<body>
+
+<h1>配色对照：从活动截图实测 → 新 token</h1>
+<div class="sub">measured from 7 event images · scripts/analyze-reference.ps1</div>
+
+<h2>实测色板 <em>面积加权真实均值，非量化桶中心</em></h2>
+<div class="row">
+
+  <div class="group">
+    <div class="gname">最深底色</div>
+    <div class="sw">
+      <i class="dk" style="background:#09080b">#09080b</i>
+      <i class="dk" style="background:#0d0b12">#0d0b12</i>
+      <i class="dk" style="background:#050506">#050506</i>
+      <i class="dk" style="background:#080808">#080808</i>
+      <i class="dk" style="background:#020202">#020202</i>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="gname">浮起面 / 卡片</div>
+    <div class="sw">
+      <i class="dk" style="background:#17141b">#17141b</i>
+      <i class="dk" style="background:#1c1725">#1c1725</i>
+      <i class="dk" style="background:#1a1a1a">#1a1a1a</i>
+      <i class="dk" style="background:#2a2434">#2a2434</i>
+      <i class="dk" style="background:#221a28">#221a28</i>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="gname">紫罗兰面 · 24.9% 饱和</div>
+    <div class="sw">
+      <i class="dk" style="background:#553878">#553878</i>
+      <i class="dk" style="background:#4d3071">#4d3071</i>
+      <i class="dk" style="background:#573877">#573877</i>
+      <i class="dk" style="background:#201a36">#201a36</i>
+      <i class="dk" style="background:#291844">#291844</i>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="gname">蓝紫 · 25.5% 饱和（最大色族）</div>
+    <div class="sw">
+      <i class="dk" style="background:#4a47d6">#4a47d6</i>
+      <i class="dk" style="background:#5c56d7">#5c56d7</i>
+      <i class="dk" style="background:#3d3486">#3d3486</i>
+      <i class="dk" style="background:#37299b">#37299b</i>
+      <i class="dk" style="background:#323b99">#323b99</i>
+    </div>
+  </div>
+
+</div>
+
+<div class="row" style="margin-top:12px">
+  <div class="group">
+    <div class="gname">绯红 · 16.5% + 酒红 6%</div>
+    <div class="sw">
+      <i class="dk" style="background:#6e1525">#6e1525</i>
+      <i class="dk" style="background:#711425">#711425</i>
+      <i class="dk" style="background:#802132">#802132</i>
+      <i class="dk" style="background:#872236">#872236</i>
+      <i class="dk" style="background:#932738">#932738</i>
+      <i class="dk" style="background:#ae5160">#ae5160</i>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="gname">暖金 / 奶油 · 13%</div>
+    <div class="sw">
+      <i class="lt" style="background:#f7d8b4">#f7d8b4</i>
+      <i class="lt" style="background:#ecd1ae">#ecd1ae</i>
+      <i class="lt" style="background:#e39434">#e39434</i>
+      <i class="lt" style="background:#d8a05d">#d8a05d</i>
+      <i class="lt" style="background:#c9985d">#c9985d</i>
+    </div>
+  </div>
+
+  <div class="group">
+    <div class="gname">亮文字 / 次级</div>
+    <div class="sw">
+      <i class="lt" style="background:#fefcfc">#fefcfc</i>
+      <i class="lt" style="background:#fafafa">#fafafa</i>
+      <i class="lt" style="background:#564957">#564957</i>
+      <i class="lt" style="background:#473947">#473947</i>
+    </div>
+  </div>
+</div>
+
+<h2>token 映射 <em>旧值 vs 新值</em></h2>
+<table>
+  <tr><th>token</th><th>旧（我编的）</th><th>新（实测）</th><th>依据</th></tr>
+  <tr>
+    <td>dark <code>background</code></td>
+    <td class="chip old"><span class="dot" style="background:#131010"></span>#131010</td>
+    <td class="chip good"><span class="dot" style="background:#0B0912"></span>#0B0912</td>
+    <td>实测 #09080b / #0d0b12 / #050506</td>
+  </tr>
+  <tr>
+    <td>dark <code>backgroundElement</code></td>
+    <td class="chip old"><span class="dot" style="background:#201A17"></span>#201A17</td>
+    <td class="chip good"><span class="dot" style="background:#1A1725"></span>#1A1725</td>
+    <td>实测 #17141b / #1c1725</td>
+  </tr>
+  <tr>
+    <td>dark <code>accent</code></td>
+    <td class="chip old"><span class="dot" style="background:#E4B45A"></span>#E4B45A 金</td>
+    <td class="chip good"><span class="dot" style="background:#8F88F2"></span>#8F88F2 蓝紫</td>
+    <td>最大色族 240-255°，占饱和 25.5%</td>
+  </tr>
+  <tr>
+    <td>dark <code>annotate</code></td>
+    <td class="chip old"><span class="dot" style="background:#E4B45A"></span>#E4B45A 金</td>
+    <td class="chip good"><span class="dot" style="background:#E0607A"></span>#E0607A 绯红</td>
+    <td>次大色族 345-360°，占饱和 16.5%</td>
+  </tr>
+  <tr>
+    <td>dark <code>gold</code></td>
+    <td class="chip old"><span class="dot" style="background:#C9A75A"></span>#C9A75A</td>
+    <td class="chip good"><span class="dot" style="background:#D8A05D"></span>#D8A05D</td>
+    <td>实测暖金，占比只有 13%，退为配角</td>
+  </tr>
+  <tr>
+    <td>dark <code>text</code></td>
+    <td class="chip old"><span class="dot" style="background:#F3EADB"></span>#F3EADB 象牙</td>
+    <td class="chip good"><span class="dot" style="background:#F5F2FA"></span>#F5F2FA</td>
+    <td>实测亮部是 #fafafa / #fefcfc</td>
+  </tr>
+  <tr>
+    <td>light <code>background</code></td>
+    <td class="chip old"><span class="dot" style="background:#F5EFE2"></span>#F5EFE2 羊皮纸</td>
+    <td class="chip good"><span class="dot" style="background:#F4F1F8"></span>#F4F1F8 淡紫</td>
+    <td><b class="bad">参考里没有浅色界面</b>，改为同色族衍生</td>
+  </tr>
+  <tr>
+    <td>light <code>accent</code></td>
+    <td class="chip old"><span class="dot" style="background:#7C1B2B"></span>#7C1B2B 酒红</td>
+    <td class="chip good"><span class="dot" style="background:#3A329B"></span>#3A329B 靛紫</td>
+    <td>实测 #37299b / #3a3370</td>
+  </tr>
+</table>
+
+<h2>新配色落到界面上 <em>深色 = 主模式</em></h2>
+<div class="row">
+  <div class="ui">
+    <div class="lbl">今日目标</div>
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:baseline">
+        <div><div class="num">12</div><div class="cap">今日新学词</div></div>
+        <div><div class="num">37</div><div class="cap">待复习</div></div>
+        <div style="flex:1;padding-left:14px;align-self:flex-end">
+          <div class="cap" style="margin-bottom:5px">还差 1 篇完成目标</div>
+          <div class="track"><div class="fill"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sentence">
+      The festival began with a single <b>float</b> rolling past balconies draped in cloth the colour of <u>amber</u>.
+    </div>
+    <div class="tag">连续 12 天</div>
+    <div class="btn">已完成阅读，谢幕</div>
+  </div>
+
+  <div class="ui" style="background:#F4F1F8;border-color:#D5CFE4">
+    <div class="lbl" style="color:#5B5270">今日目标</div>
+    <div class="card" style="background:#FFFFFF;border-color:#D5CFE4">
+      <div class="row" style="justify-content:space-between;align-items:baseline">
+        <div><div class="num" style="color:#0D0B16">12</div><div class="cap" style="color:#5B5270">今日新学词</div></div>
+        <div><div class="num" style="color:#0D0B16">37</div><div class="cap" style="color:#5B5270">待复习</div></div>
+        <div style="flex:1;padding-left:14px;align-self:flex-end">
+          <div class="cap" style="margin-bottom:5px;color:#5B5270">还差 1 篇完成目标</div>
+          <div class="track" style="background:#E6E1F2"><div class="fill" style="background:#3A329B"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="sentence" style="color:#0D0B16">
+      The festival began with a single <b style="color:#8E2338">float</b> rolling past balconies draped in cloth the colour of <u style="color:#6E1428">amber</u>.
+    </div>
+    <div class="tag" style="background:#E6E2F7;color:#3A329B;border-color:#A8722E">连续 12 天</div>
+    <div class="btn" style="background:#332C8C;color:#F7F4FB">已完成阅读，谢幕</div>
+  </div>
+
+  <div class="note" style="max-width:520px">
+    <b>浅色是衍生、不是还原。</b> 7 张参考图暗部占比 48%–78%，<b>没有任何浅色界面</b>。
+    所以浅色只保留同一套色族（靛紫强调 + 绯红标注 + 金线）反转过来，
+    在文档里也标注为"衍生"，不当成对活动的还原。<br><br>
+    <b>还没做的：形态。</b> 这次只换了配色（可从像素可靠量出）。
+    描边粗细、角标形状、字距节奏、字体族这些<b>量不出语义</b>，
+    需要视觉模型恢复或你的文字描述——目前的衬线 + 方直角 + 金刻线仍是我按"印刷品"编的。
+  </div>
+</div>
+
+</body>
+</html>

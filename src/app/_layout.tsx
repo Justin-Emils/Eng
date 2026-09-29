@@ -1,17 +1,18 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
+import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect, useState } from 'react';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import { Colors } from '@/constants/theme';
+import { APP_FONTS } from '@/constants/fonts';
 import { hydrateRemoteArticles } from '@/data/articles/remote-registry';
 import { getAuthState, hydrateAuth } from '@/domain/auth/store';
 import { ensureDailyCorpusUpdate } from '@/domain/corpus/update';
 import { autoSyncAfterLogin } from '@/domain/sync';
-import { useResolvedScheme } from '@/hooks/use-theme';
-import { hydrateThemeMode } from '@/hooks/use-theme-mode';
+import { useResolvedScheme, useTheme } from '@/hooks/use-theme';
+import { hydrateThemePrefs } from '@/hooks/use-theme-pref';
 import { getSettings } from '@/storage/settings';
 import { migrateStorageIfNeeded } from '@/storage/words';
 
@@ -30,7 +31,14 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const router = useRouter();
   const scheme = useResolvedScheme();
+  const palette = useTheme();
   const isDark = scheme === 'dark';
+  /**
+   * 内嵌字体(Literata,见 constants/fonts.ts)。
+   * **必须等它加载完再收启动遮罩**:否则第一帧会用系统字体渲染,
+   * 字体到位后整屏文字会"跳"一下 —— 那是很明显的廉价感来源。
+   */
+  const [fontsLoaded] = useFonts(APP_FONTS);
   const [bootChecked, setBootChecked] = useState(false);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   /** 启动时是否已登录 —— 决定"还没建本机学习档案"时去 welcome 还是直接补引导 */
@@ -39,8 +47,8 @@ export default function RootLayout() {
   useEffect(() => {
     void migrateStorageIfNeeded();
     void (async () => {
-      // 主题模式先水化,避免首帧用错配色
-      await hydrateThemeMode();
+      // 主题模式先水化,避免首帧用错配色(深浅模式与主题 id 一起读)
+      await hydrateThemePrefs();
       const settings = await getSettings();
       let onboarded = settings.onboarded;
 
@@ -85,12 +93,11 @@ export default function RootLayout() {
     }
   }, [bootChecked, needsOnboarding, authedAtBoot, router]);
 
-  // 窗口背景跟随主题
+  // 窗口背景跟随主题(主题或深浅色任一变化都要重设,否则切换主题时
+  // Android 窗口底会残留上一套主题的底色)
   useEffect(() => {
-    void SystemUI.setBackgroundColorAsync(
-      isDark ? Colors.dark.background : Colors.light.background,
-    ).catch(() => {});
-  }, [isDark]);
+    void SystemUI.setBackgroundColorAsync(palette.background).catch(() => {});
+  }, [palette.background]);
 
   return (
     <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
@@ -98,7 +105,8 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
       </Stack>
-      <AnimatedSplashOverlay ready={bootChecked} />
+      {/* 两个条件都满足才淡出:启动数据就绪 + 内嵌字体已加载 */}
+      <AnimatedSplashOverlay ready={bootChecked && fontsLoaded} />
     </ThemeProvider>
   );
 }

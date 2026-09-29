@@ -3,13 +3,20 @@ import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { PlaybillCover } from '@/components/playbill-cover';
 import { ThemedText } from '@/components/themed-text';
 import { articleEmoji, coverColor } from '@/domain/cover';
-import { useTheme } from '@/hooks/use-theme';
+import { useResolvedScheme, useTheme, useThemeSkin } from '@/hooks/use-theme';
 import type { Article } from '@/types';
 
 /**
- * 文章视觉封面 —— 多级真实图回退,任何一层"加载不出来"都会跳到下一层:
+ * 文章视觉封面。按主题分两条路:
+ *
+ * **叙拉古主题(motifs 开启)→ 程序化"节目单"封面**:
+ *   按文章 id 稳定生成,完全离线、零素材、风格统一。网络那套逻辑根本不进入执行路径。
+ *   见 `components/playbill-cover.tsx` 的文件头说明。
+ *
+ * **默认主题 → 原来的多级真实图回退**(原样保留,不动):
  * 1. coverUrl(Wikimedia Commons 开放许可图);
  *    —— 但 Wikimedia 在国内常被墙,一旦确认不可达,以后直接跳过本层;
  * 2. picsum.photos seed 图(id 稳定 → 每篇不同的真实图);
@@ -26,6 +33,15 @@ export function ArticleCover({
   size?: 'thumb' | 'banner' | 'hero';
 }) {
   const theme = useTheme();
+  const skin = useThemeSkin();
+  const scheme = useResolvedScheme();
+  /**
+   * 封面来源由 `skin.coverArt` 单独决定,**不跟随 `motifs`**。
+   * 随机照片封面在任何主题下都是缺陷(与文章无关、依赖网络、要处理超时),
+   * 所以它是一个可以和"要不要纹样"分开决定的选择。
+   * 判定必须放在 hooks 之后、条件 return 之前,避免换主题时 hook 数量变化。
+   */
+  const usePlaybill = skin.coverArt === 'playbill';
 
   const cacheKey = article.coverUrl ? `${article.id}|${article.coverUrl}` : article.id;
   const tiers = useMemo(
@@ -80,10 +96,23 @@ export function ArticleCover({
   const isHero = size === 'hero';
   const isThumb = size === 'thumb';
   const frame = isHero ? styles.hero : isThumb ? styles.thumb : styles.banner;
+  /**
+   * 封面圆角也跟主题走:
+   * 缩略/横幅 = 次级面板(默认 8 / 叙拉古 2),大图 = 卡片(默认 16 / 叙拉古 3)。
+   * 与原值(10 / 12 / 20)有几像素出入,肉眼不可辨,换来的是"圆角只有一个来源"。
+   */
+  const radius = isHero
+    ? { borderBottomLeftRadius: skin.radiusCard, borderBottomRightRadius: skin.radiusCard }
+    : { borderRadius: skin.radiusPanel };
+
+  /** 节目单封面:不发起任何请求,也没有加载态 */
+  if (usePlaybill) {
+    return <PlaybillCover article={article} size={size} style={[frame, radius]} />;
+  }
 
   if (uri) {
     return (
-      <View style={[styles.wrap, frame, { backgroundColor: theme.backgroundElement }]}>
+      <View style={[styles.wrap, frame, radius, { backgroundColor: theme.backgroundElement }]}>
         <Image
           key={uri}
           source={{ uri }}
@@ -100,12 +129,17 @@ export function ArticleCover({
   // 最终回退:渐变 + emoji
   const main = coverColor(article.id);
   const emoji = articleEmoji(article.topicTags);
-  const light = theme.background === '#ffffff';
+  /**
+   * 曾经这里是 `theme.background === '#ffffff'` —— 拿底色当"是不是浅色"的探针。
+   * 只要主题的浅色底不是纯白(比如叙拉古的羊皮纸),这个判断就永远为 false,
+   * 浅色模式会静默走深色分支。深浅色就该问深浅色本身。
+   */
+  const light = scheme === 'light';
   const tint = light ? 0.14 : 0.3;
   const base = mixWithWhite(main, light);
 
   return (
-    <View style={[styles.wrap, frame, { backgroundColor: base }]}>
+    <View style={[styles.wrap, frame, radius, { backgroundColor: base }]}>
       <View style={[styles.orb, { backgroundColor: main, opacity: tint }]} />
       <View style={[styles.orbSmall, { backgroundColor: main, opacity: light ? 0.1 : 0.22 }]} />
       <View style={styles.emojiWrap}>
@@ -205,15 +239,26 @@ function mixWithWhite(hex: string, light: boolean): string {
 
 const styles = StyleSheet.create({
   wrap: { overflow: 'hidden' },
+  /**
+   * 略:封面**只提供高度,宽度一律由父容器决定**。
+   *
+   * - 列布局父容器(文章库大卡、最新短文条、阅读页大图)→ `alignItems` 默认 stretch,
+   *   自动撑满,不用管;
+   * - **行布局父容器 → 调用方必须自己包一层固定宽度的 View**
+   *   (见 `recommend-card.tsx` 的 `cover`、`(tabs)/index.tsx` 的 `continueCover`)。
+   *
+   * 不加宽度是有意的:同一个 `thumb` 在列表里要撑满卡片、在行内要固定成海报比例,
+   * 写死一个值两头都不对。但漏了包裹层不会报错,只会静默退化成"内容宽度"
+   * —— 这一条踩过一次,所以写在这里。
+   * 圆角由主题给(见组件里的 radius 内联),默认主题是 8,叙拉古是方直角。
+   */
   thumb: {
     height: 80,
-    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   banner: {
     height: 88,
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },

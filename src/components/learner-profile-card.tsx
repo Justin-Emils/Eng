@@ -16,20 +16,16 @@
 
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Star } from '@/components/ornaments';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import type { LearnerProfile } from '@/domain/profile';
-import { useResolvedScheme, useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 
 /** 词汇量展示量程(与 wordlevel 的门槛刻度一致) */
 const SCALE_MIN = 300;
 const SCALE_MAX = 12000;
-
-const TRAIT_COLORS = {
-  light: { strength: '#1B5E20', gap: '#C62828', note: '#60646C' },
-  dark: { strength: '#81C784', gap: '#FF8A80', note: '#B0B4BA' },
-} as const;
 
 /** 折叠进画像卡的阅读统计(不传则不显示这一段) */
 export interface ReadingSummary {
@@ -56,8 +52,13 @@ export function LearnerProfileCard({
   onAssess?: () => void;
 }) {
   const theme = useTheme();
-  const scheme = useResolvedScheme();
-  const traitColors = TRAIT_COLORS[scheme];
+  const skin = useThemeSkin();
+  /** 标签按语义取主题色,不再写死 —— 换主题时这一块跟着走 */
+  const traitColors = {
+    strength: theme.success,
+    gap: theme.danger,
+    note: theme.textSecondary,
+  } as const;
   const divider = { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border };
 
   // 区间条:点估计位置 + 区间宽度(百分比)
@@ -70,7 +71,7 @@ export function LearnerProfileCard({
     profile.mode === 'fine' ? '精细评估' : profile.mode === 'pick' ? '自选档位' : '快速评估';
 
   return (
-    <ThemedView type="backgroundElement" style={styles.card}>
+    <ThemedView type="backgroundElement" frame="playbill" style={styles.card}>
       {/* ── 词汇量 + 区间 ── */}
       <View style={styles.block}>
         <View style={styles.headerRow}>
@@ -106,7 +107,11 @@ export function LearnerProfileCard({
         </ThemedText>
 
         {/* 区间可视化:灰轨道 + 区间段 + 点估计刻度 */}
-        <View style={[styles.track, { backgroundColor: theme.backgroundSelected }]}>
+        <View
+          style={[
+            styles.track,
+            { borderRadius: skin.radiusChip, backgroundColor: theme.backgroundSelected },
+          ]}>
           <View
             style={[
               styles.range,
@@ -130,7 +135,11 @@ export function LearnerProfileCard({
               <ThemedText type="small" themeColor="textSecondary" style={styles.bandLabel}>
                 {band.label}
               </ThemedText>
-              <View style={[styles.bandTrack, { backgroundColor: theme.backgroundSelected }]}>
+              <View
+                style={[
+                  styles.bandTrack,
+                  { borderRadius: skin.radiusChip, backgroundColor: theme.backgroundSelected },
+                ]}>
                 <View
                   style={[
                     styles.bandFill,
@@ -168,9 +177,15 @@ export function LearnerProfileCard({
           ))}
           {profile.suggestion ? (
             <View style={styles.traitRow}>
-              <ThemedText type="small" style={[styles.traitMark, { color: theme.accent }]}>
-                👉
-              </ThemedText>
+              {skin.motifs ? (
+                <View style={styles.traitMarkWrap}>
+                  <Star size={6} />
+                </View>
+              ) : (
+                <ThemedText type="small" style={[styles.traitMark, { color: theme.accent }]}>
+                  👉
+                </ThemedText>
+              )}
               <ThemedText type="small" themeColor="accent" style={styles.traitText}>
                 {profile.suggestion}
               </ThemedText>
@@ -200,29 +215,32 @@ export function LearnerProfileCard({
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: Spacing.three, padding: Spacing.three },
+  card: { padding: Spacing.three },
   block: { gap: Spacing.two },
   /** 段与段之间的分隔(细线 + 上间距) */
   blockTop: { marginTop: Spacing.three, paddingTop: Spacing.three },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   vocabRow: { flexDirection: 'row', alignItems: 'baseline', gap: Spacing.one + 2 },
-  vocab: { fontSize: 44, lineHeight: 52 },
+  /** 词汇量是这一屏最重的一个数字,用衬线大号字 */
+  vocab: { fontSize: 42, lineHeight: 50 },
   unit: { paddingBottom: Spacing.one },
   refChip: { marginLeft: Spacing.one },
   refChipText: { fontSize: 12 },
-  track: { height: 10, borderRadius: 999, overflow: 'hidden', marginTop: Spacing.one },
-  range: { position: 'absolute', top: 0, bottom: 0, borderRadius: 999 },
-  point: { position: 'absolute', top: -3, width: 3, height: 16, borderRadius: 2 },
+  track: { height: 6, overflow: 'hidden', marginTop: Spacing.one },
+  range: { position: 'absolute', top: 0, bottom: 0 },
+  point: { position: 'absolute', top: -3, width: 2, height: 12 },
 
   bandRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   bandLabel: { width: 92, fontSize: 12, lineHeight: 16 },
-  bandTrack: { flex: 1, height: 8, borderRadius: 999, overflow: 'hidden' },
-  bandFill: { height: '100%', borderRadius: 999 },
+  bandTrack: { flex: 1, height: 5, overflow: 'hidden' },
+  bandFill: { height: '100%' },
   bandPct: { width: 38, textAlign: 'right', fontSize: 12 },
   bandCount: { width: 42, textAlign: 'right', fontSize: 11 },
 
   traitRow: { flexDirection: 'row', gap: Spacing.two, alignItems: 'flex-start' },
   traitMark: { width: 16, fontWeight: '700' },
+  /** 纹样菱形与 emoji 对齐:同样的 16px 列宽 */
+  traitMarkWrap: { width: 16, paddingTop: 5 },
   traitText: { flex: 1, lineHeight: 19 },
 
   footer: { gap: Spacing.one + 2 },

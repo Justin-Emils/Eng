@@ -3,7 +3,7 @@ import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radii, Spacing } from '@/constants/theme';
 import type { LookupResult } from '@/domain/dictionary';
 import { useTheme } from '@/hooks/use-theme';
 import { useWordSaved } from '@/hooks/use-word-saved';
@@ -138,7 +138,7 @@ export function DictCard({
             ) : (
               <>
                 {kaoyan ? (
-                  <ThemedView type="backgroundSelected" style={styles.flagBadge}>
+                  <ThemedView type="backgroundSelected" radius="chip" style={styles.flagBadge}>
                     <ThemedText type="smallBold" themeColor="accent">
                       考研词 · 已收录词形
                     </ThemedText>
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.half,
-    borderRadius: 999,
+    borderRadius: Radii.sharp,
   },
   titleCol: {
     flexShrink: 1,
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   smallBtn: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
   },
   studyRow: {
     flexDirection: 'row',

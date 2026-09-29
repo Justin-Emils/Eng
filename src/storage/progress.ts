@@ -70,16 +70,23 @@ export async function getCompletedArticleIds(): Promise<Set<string>> {
 }
 
 /**
- * 最近在读、但还没读完的文章(按更新时间倒序)。
- * 供首页「继续阅读」卡片使用;只返回读过至少一段的,避免把刚点开就退出的算进去。
+ * 最近读过的文章进度,按更新时间倒序(**含已读完**)。
+ *
+ * 首页「继续阅读」要回答的是"我上次读到哪儿",而不是"还有哪篇没读完":
+ * 读完的文章同样是"上次读的",若把它排除掉,首页会倒退到更早的未读完文章,
+ * 用户会觉得进度被重置。因此这里不按 completed 过滤,由调用方决定
+ * 已完成时展示 100%。
+ *
+ * 返回列表而非单条,是为了让调用方能跳过已下架/查不到的文章继续往前找。
+ * 仍要求"读过至少一段(或已读完)",避免把刚点开就退出的算进去。
  */
-export async function getInProgressArticles(): Promise<ReadingProgress[]> {
+export async function getRecentReadingProgress(): Promise<ReadingProgress[]> {
   try {
     const raw = await AsyncStorage.getItem(PROGRESS_KEY);
     if (!raw) return [];
     const map = JSON.parse(raw) as Record<string, ReadingProgress>;
     return Object.values(map)
-      .filter((p) => !p.completed && (p.paragraphIndex ?? 0) > 0)
+      .filter((p) => p.completed || (p.paragraphIndex ?? 0) > 0)
       .sort((a, b) => b.updatedAt - a.updatedAt);
   } catch {
     return [];

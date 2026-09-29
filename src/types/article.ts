@@ -51,7 +51,7 @@ export interface ArticleDifficulty {
   vocab: number;
   /** 正文词数 */
   wordCount: number;
-  /** 估算阅读分钟(按 120–180 wpm) */
+  /** 估算阅读分钟(按文章等级对应的学习者阅读速度,见 data/articles/build.ts) */
   minutes: number;
 }
 

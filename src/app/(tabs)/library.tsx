@@ -8,13 +8,13 @@ import { EmptyState } from '@/components/empty-state';
 import { LatestStrip } from '@/components/latest-strip';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { getAllArticles } from '@/data/articles';
 import { remoteArticles } from '@/data/articles/remote-registry';
 import { LEVEL_BANDS } from '@/domain/levels';
 import { difficultyOf } from '@/domain/difficulty';
 import { useCompletedArticleIds } from '@/hooks/use-completed-articles';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import { loadRemoteArticles } from '@/storage/remote-articles';
 import type { Article } from '@/types';
 
@@ -33,6 +33,7 @@ const MODES: { key: ViewMode; label: string }[] = [
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const skin = useThemeSkin();
   const [mode, setMode] = useState<ViewMode>('topic');
   const [query, setQuery] = useState('');
   const completedIds = useCompletedArticleIds();
@@ -114,6 +115,7 @@ export default function LibraryScreen() {
           placeholderTextColor={theme.textSecondary}
           style={[
             styles.searchInput,
+            { borderRadius: skin.radiusCard },
             {
               color: theme.text,
               backgroundColor: theme.backgroundElement,
@@ -133,6 +135,7 @@ export default function LibraryScreen() {
             <Pressable key={m.key} onPress={() => setMode(m.key)} style={styles.modeBtn}>
               <ThemedView
                 type={active ? 'backgroundSelected' : 'backgroundElement'}
+                radius="chip"
                 style={[styles.modeChip, active && { borderColor: theme.accent }]}>
                 <ThemedText type="smallBold" themeColor={active ? 'accent' : 'textSecondary'}>
                   {m.label}
@@ -210,7 +213,7 @@ const styles = StyleSheet.create({
   searchInput: {
     minHeight: 44,
     borderWidth: 1,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     paddingHorizontal: Spacing.three,
     fontSize: 16,
   },
@@ -224,7 +227,7 @@ const styles = StyleSheet.create({
   modeChip: {
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.one,
-    borderRadius: 999,
+    borderRadius: Radii.sharp,
     borderWidth: 1,
     borderColor: 'transparent',
   },

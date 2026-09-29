@@ -16,11 +16,13 @@ import { useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Star, Medallion } from '@/components/ornaments';
 import { PrimaryButton } from '@/components/primary-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { isBackendConfigured } from '@/config/backend';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useThemeSkin } from '@/hooks/use-theme';
 
 const FEATURES: [string, string][] = [
   ['🎯', '按你的词汇量推荐文章'],
@@ -32,6 +34,7 @@ const FEATURES: [string, string][] = [
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const skin = useThemeSkin();
 
   /** 跳过登录:直接进入「完善个人信息 + 学习计划」,数据只留在本机 */
   const handleSkip = () => {
@@ -48,7 +51,11 @@ export default function WelcomeScreen() {
         keyboardShouldPersistTaps="always">
         {/* 品牌区 */}
         <View style={styles.hero}>
-          <ThemedText style={styles.logo}>📚</ThemedText>
+          {skin.motifs ? (
+            <Medallion size={72} />
+          ) : (
+            <ThemedText style={styles.logo}>📚</ThemedText>
+          )}
           <ThemedText type="subtitle" style={styles.appName}>
             考研英语阅读
           </ThemedText>
@@ -61,7 +68,11 @@ export default function WelcomeScreen() {
         <View style={styles.features}>
           {FEATURES.map(([emoji, text]) => (
             <View key={text} style={styles.featureRow}>
-              <ThemedText style={styles.featureEmoji}>{emoji}</ThemedText>
+              {skin.motifs ? (
+                <Star size={7} style={styles.featureMark} />
+              ) : (
+                <ThemedText style={styles.featureEmoji}>{emoji}</ThemedText>
+              )}
               <ThemedText type="small" themeColor="textSecondary" style={styles.featureText}>
                 {text}
               </ThemedText>
@@ -113,6 +124,8 @@ const styles = StyleSheet.create({
   features: { gap: Spacing.two, paddingHorizontal: Spacing.two },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   featureEmoji: { fontSize: 20, lineHeight: 24 },
+  /** 纹样菱形:固定 22px 占位,与原来的 emoji 等宽,文字列才对得齐 */
+  featureMark: { width: 22, marginTop: 2 },
   featureText: { flex: 1, lineHeight: 20 },
   actions: { gap: Spacing.two + 2 },
   skipBlock: { alignItems: 'center', gap: Spacing.one + 2 },

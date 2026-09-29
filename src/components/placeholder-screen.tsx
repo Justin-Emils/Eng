@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /**
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     gap: Spacing.one,
     padding: Spacing.four,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     marginTop: Spacing.four,
   },
   hintAccent: {

@@ -5,11 +5,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { SkeletonList } from '@/components/skeleton';
+import { Star } from '@/components/ornaments';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { getArticleById } from '@/data/articles';
-import { useTheme } from '@/hooks/use-theme';
+import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import { countByStatus, getWords } from '@/storage/words';
 import type { WordItem } from '@/types';
 
@@ -22,6 +23,7 @@ import type { WordItem } from '@/types';
 export default function WordsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const skin = useThemeSkin();
   const [words, setWords] = useState<WordItem[] | null>(null);
   const [dueCount, setDueCount] = useState(0);
 
@@ -76,9 +78,14 @@ export default function WordsScreen() {
               onPress={() => router.push('/review')}
               style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundSelected" style={styles.reviewBar}>
-                <ThemedText type="smallBold" themeColor="accent">
-                  {dueCount > 0 ? `🔁 ${dueCount} 个词到期待复习 →` : '🔁 暂无到期词,去复习页看看'}
-                </ThemedText>
+                <View style={styles.reviewBarInner}>
+                  {skin.motifs ? <Star size={6} /> : null}
+                  <ThemedText type="smallBold" themeColor="accent">
+                    {dueCount > 0
+                      ? `${dueCount} 个词到期待复习 →`
+                      : '暂无到期词,去复习页看看'}
+                  </ThemedText>
+                </View>
               </ThemedView>
             </Pressable>
           }
@@ -130,6 +137,7 @@ function WordRow({
             </ThemedText>
             <ThemedView
               type="backgroundSelected"
+              radius="chip"
               style={[styles.statusChip, mastered && { borderColor: theme.accent }]}>
               <ThemedText
                 type="small"
@@ -204,12 +212,12 @@ const styles = StyleSheet.create({
   reviewBar: {
     alignItems: 'center',
     paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
     marginBottom: Spacing.one,
   },
+  reviewBarInner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   row: {
     padding: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     gap: Spacing.one,
   },
   rowPressed: {
@@ -237,7 +245,7 @@ const styles = StyleSheet.create({
   statusChip: {
     paddingHorizontal: Spacing.two,
     paddingVertical: Spacing.half,
-    borderRadius: 999,
+    borderRadius: Radii.sharp,
     borderWidth: 1,
     borderColor: 'transparent',
   },

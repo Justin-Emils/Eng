@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { LearnerProfileCard } from '@/components/learner-profile-card';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import {
   WORDS_PER_ROUND,
   START_BAND,
@@ -430,13 +430,13 @@ const styles = StyleSheet.create({
   paragraph: { lineHeight: 20 },
   errorBox: {
     padding: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
   },
   actionBtn: {
     alignItems: 'center',
     paddingVertical: Spacing.three,
     paddingHorizontal: Spacing.four,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     gap: Spacing.half,
   },
   levelRow: {
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radii.card,
     borderWidth: 1,
     borderColor: 'transparent',
   },
