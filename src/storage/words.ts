@@ -7,6 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { markLearned, unmarkLearnedToday } from '@/storage/learning';
+import { now as clockNow } from '@/domain/clock';
 
 import { makeWordItem, type NewWordInput } from '@/domain/words';
 import { isDue } from '@/domain/srs';
@@ -62,7 +63,7 @@ export async function isWordSaved(headword: string): Promise<boolean> {
 }
 
 /** 到期可复习的词(按到期时间升序;mastered/ignored 不计入) */
-export async function getDueWords(now = Date.now()): Promise<WordItem[]> {
+export async function getDueWords(now = clockNow()): Promise<WordItem[]> {
   const words = await getWords();
   return words.filter((w) => isDue(w, now)).sort((a, b) => a.review.dueAt - b.review.dueAt);
 }

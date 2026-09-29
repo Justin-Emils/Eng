@@ -17,6 +17,7 @@ import { DEFAULT_AVATAR, getAccount, saveAccount } from '@/storage/account';
 import { bindLocalOwner, getLocalOwnerSync } from '@/storage/local-owner';
 import { getSettings } from '@/storage/settings';
 import { hashString, saveSyncState } from '@/storage/sync-state';
+import { now } from '@/domain/clock';
 import { getWords } from '@/storage/words';
 
 export interface RemoteBackup {
@@ -174,7 +175,7 @@ export async function pushBackup(): Promise<void> {
    * 自动同步靠它判断"本机从那以后有没有改动";没有基线时自动同步不会做第一次上传
    * —— 那等于静默决定"以本机为准",必须由用户先定方向(见 domain/autosync)。
    */
-  await saveSyncState({ lastHash: hashString(raw), lastPushedAt: Date.now() });
+  await saveSyncState({ lastHash: hashString(raw), lastPushedAt: now() });
 }
 
 /** 读取云端备份(没有则返回 null) */

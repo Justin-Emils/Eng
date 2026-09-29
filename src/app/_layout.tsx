@@ -19,6 +19,7 @@ import { getSettings } from '@/storage/settings';
 import { hydrateLocalOwner } from '@/storage/local-owner';
 import { hydrateReviewStats } from '@/storage/review-stats';
 import { hydrateSyncState } from '@/storage/sync-state';
+import { ensureFreshClock, hydrateClock } from '@/domain/clock';
 import { migrateStorageIfNeeded } from '@/storage/words';
 
 SplashScreen.preventAutoHideAsync();
@@ -63,6 +64,12 @@ export default function RootLayout() {
       await hydrateReviewStats();
       await hydrateLocalOwner();
       await hydrateSyncState();
+      /**
+       * 网络时间:先把上次校准的偏移读进来(离线也能用),再尝试联网校准一次。
+       * 打卡、连续天数与复习到期都以它为准 —— 不能由用户改系统时间左右。
+       */
+      await hydrateClock();
+      void ensureFreshClock();
       const settings = await getSettings();
       let onboarded = settings.onboarded;
 
@@ -122,7 +129,11 @@ export default function RootLayout() {
     run();
     const timer = setInterval(run, 60_000);
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') run();
+      if (next === 'active') {
+        run();
+        // 回到前台顺带刷新网络时间(超过 6 小时才真的发请求)
+        void ensureFreshClock();
+      }
     });
     return () => {
       clearInterval(timer);

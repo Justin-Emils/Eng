@@ -16,6 +16,7 @@ import { isImageAvatar, pickAvatarFromLibrary } from '@/domain/avatar';
 import { signOut } from '@/domain/auth/store';
 import { describeBackup, exportBackup, importBackup } from '@/domain/backup';
 import { describeLastSync } from '@/domain/autosync';
+import { describeClock } from '@/domain/clock';
 import { adoptLocalDataToCurrentAccount, getOwnershipStatus, pullBackup, pushBackup, pushProfile, restoreFromCloud } from '@/domain/sync';
 import type { OwnershipCheck } from '@/domain/ownership';
 import { clearLocalOwner } from '@/storage/local-owner';
@@ -513,6 +514,10 @@ export default function AccountScreen() {
                 冲突时把两个"明确选择"摆在这里,而不是让用户在别处猜怎么处理。
               */}
               <SettingRow
+                label="时间来源"
+                sublabel={`打卡、连续天数与复习计划都按服务器时间计算(${describeClock()})`}
+                value="联网校准"
+              />              <SettingRow
                 label="本机数据归属"
                 sublabel={ownership?.message ?? '读取中…'}
                 value={

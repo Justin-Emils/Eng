@@ -16,6 +16,7 @@
 import { exportBackup } from '@/domain/backup';
 import { getAuthState } from '@/domain/auth/store';
 import { getOwnershipStatus, pushBackup } from '@/domain/sync';
+import { now as clockNow } from '@/domain/clock';
 import { getSyncStateSync, hashString, saveSyncState } from '@/storage/sync-state';
 
 export type AutoSyncStatus = 'pushed' | 'unchanged' | 'skipped' | 'blocked' | 'error';
@@ -68,7 +69,7 @@ export async function maybeAutoSync(): Promise<AutoSyncResult> {
 
   try {
     await pushBackup();
-    const pushedAt = Date.now();
+    const pushedAt = clockNow();
     await saveSyncState({ lastHash: hash, lastPushedAt: pushedAt });
     return { status: 'pushed', reason: '已同步到云端', pushedAt };
   } catch (e) {
@@ -82,7 +83,7 @@ export async function maybeAutoSync(): Promise<AutoSyncResult> {
  */
 export async function markPulled(): Promise<void> {
   const raw = await exportBackup();
-  await saveSyncState({ lastHash: hashString(raw), lastPulledAt: Date.now() });
+  await saveSyncState({ lastHash: hashString(raw), lastPulledAt: clockNow() });
 }
 
 /** 「上次同步」的人话表述(账号页展示) */

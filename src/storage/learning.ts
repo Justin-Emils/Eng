@@ -7,14 +7,21 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { nowDate } from '@/domain/clock';
+
 const LEARNING_KEY = 'readingapp.learning.v1';
 const KNOWN_KEY = 'readingapp.known.v1';
 
-/** 与 checkins 一致:本地日期键 YYYY-MM-DD */
-export function todayKey(now = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
+/**
+ * 今天的日期键(YYYY-MM-DD)。
+ *
+ * **时间来自网络校准的服务器时间**(见 domain/clock):打卡与连续天数建立在
+ * "今天是哪天"之上,不能由用户改系统时间来左右;离线时用上次校准的偏移 + 本机时钟。
+ */
+export function todayKey(date = nowDate()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
 }
 

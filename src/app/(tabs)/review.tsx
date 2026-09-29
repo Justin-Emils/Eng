@@ -20,6 +20,7 @@ import {
 } from '@/domain/srs';
 import { getAllLearningWords, getDueWords, updateWordReview } from '@/storage/words';
 import { recordReviewResult } from '@/storage/review-stats';
+import { now as clockNow } from '@/domain/clock';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import type { WordItem } from '@/types';
 
@@ -148,7 +149,7 @@ export default function ReviewScreen() {
    */
   const gradeCurrent = async (grade: SelfGrade) => {
     if (!current || mode !== 'question') return;
-    const next = scheduleReview(current, grade);
+    const next = scheduleReview(current, grade, clockNow());
     const outcome = readOutcome(current, grade, next);
     const updated: WordItem = { ...current, status: next.status, review: next.review };
     await updateWordReview(updated);
@@ -180,7 +181,7 @@ export default function ReviewScreen() {
    */
   const markAsForgotten = async () => {
     if (!current || lastGrade !== 'good') return;
-    const next = scheduleReview(current, 'again');
+    const next = scheduleReview(current, 'again', clockNow());
     const outcome = readOutcome(current, 'again', next);
     const updated: WordItem = { ...current, status: next.status, review: next.review };
     await updateWordReview(updated);
