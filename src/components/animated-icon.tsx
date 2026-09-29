@@ -29,32 +29,22 @@ const MIN_SHOW_MS = 1300;
 const STAGE_SIZE = Math.min(Math.round(Dimensions.get('screen').width * 0.68), 280);
 
 /**
- * 角色动画把角色合成在了**不透明的平坦底色**上,这个底色就是这里:
+ * 角色动画用 `assets/anim/walk-transparent.webp`:**带透明通道**,不挑底色。
  *
- *   `assets/anim/walk-blue.webp` —— 720×720 / 96 帧,逐像素实测底角与中心区的众数色,
- *   得到 RGB(30,137,237)(编码时的意图值是品牌蓝 #208AEF,差 2/255,肉眼不可见)。
+ * 它是怎么来的(以前这里写着"没有 ffmpeg、做不出透明版",那是不对的):
+ *   1. 素材 `character.webm` 是「浅色角色 + 纯黑背景」的 AV1 视频,没有 alpha;
+ *   2. ffmpeg(Anaconda 的 imageio_ffmpeg 里带了一个)逐帧导出 PNG,用**亮度作 alpha**:
+ *      `alphamerge` 把灰度通道并成透明度 —— 黑底自然全透明,角色边缘保留抗锯齿;
+ *   3. **不能用 ffmpeg 直接转 WebP**:动图 WebP 的帧间混合不会擦除上一帧的透明区,
+ *      会出现"每一帧叠加"的鬼影(旧版 walk-white/walk-dark 就是这么坏的:
+ *      实测内容像素从 14582 单调涨到 19060)。所以改用 Pillow 逐帧完整写入;
+ *   4. Pillow 写动图时 `quality` 基本不起作用(实测 78→50 只差 200 KB,走的无损路径),
+ *      而亮度渐变出来的软边极难无损压缩(2.8 MB)。把 alpha **二值化**后降到 881 KB。
  *
- * 也就是说:**这个动画没有 alpha 通道**,画到哪都会带出一个实心色块。
- * 同目录下的 walk-white / walk-dark 经实测是**空白帧**(整帧最大色彩偏差 0–10,没有角色),
- * walk-alpha-lossless 的 alpha 实测全是 255(并没有真的透明),都不能用。
- * 目前没有 ffmpeg,无法把动画重新编码成带透明通道的版本。
- *
- * 所以这里的处理是**把它当成设计元素、而不是假装它是背景**:
- * 角色待在一个金线描边的圆形"舞台"里,底色 = 动画自身的底色,边缘由圆裁剪收干净。
- * 于是整屏的背景、幕布轨、标题、加载点全部来自主题,只有这一块是素材自带的蓝。
- *
- * 如果以后拿到带透明通道的动画,把 STAGE_SIZE 的裁剪去掉、容器底色换成
- * theme.background 即可,其余布局不用动。
+ * 尺寸:按所有帧的**并集包围盒**裁到 235×333(原 720×720 的 15% 像素)——
+ * 走动时角色会左右摆,只按单帧裁会切到手脚。
  */
-const SPLASH_STAGE = '#208AEF';
-
-/**
- * 角色在动画帧里的位置(逐帧实测包围盒 x246–427 / y278–577,画布 720×720):
- * 它的视觉中心比画布中心**低约 9.4%**,直接摆进圆盘会明显偏下。
- * 这两个系数用来把它摆正,并让它占满圆盘的大部分(否则角色只有圆盘的 1/4 高,太小)。
- */
-const STAGE_ZOOM = 1.55;
-const STAGE_NUDGE_RATIO = 0.145;
+const WALK_ASPECT = 235 / 333;
 
 /**
  * 启动遮罩。
@@ -110,7 +100,10 @@ export function AnimatedSplashOverlay({ ready = true }: { ready?: boolean }) {
       />
 
       <View style={styles.content}>
-        {/* 舞台:圆裁剪 + 金线描边 + 动画自身底色 */}
+        {/*
+          舞台:圆裁剪 + 金线描边。底色取主题的 accentSoft(以前这里写死品牌蓝 ——
+          因为那时动画自带宽底;现在动画是透明的,圆盘只是一个设计元素,自然跟着主题走)。
+        */}
         <View
           style={[
             styles.stage,
@@ -119,21 +112,17 @@ export function AnimatedSplashOverlay({ ready = true }: { ready?: boolean }) {
               height: STAGE_SIZE,
               borderRadius: STAGE_SIZE / 2,
               borderColor: theme.gold,
-              backgroundColor: SPLASH_STAGE,
+              backgroundColor: theme.accentSoft,
             },
           ]}>
-          {/* 外层只做位移、内层只做缩放:两件事分开,免得 transform 的组合顺序踩坑 */}
-          <View style={{ transform: [{ translateY: -STAGE_NUDGE_RATIO * STAGE_SIZE }] }}>
-            <Image
-              style={{
-                width: STAGE_SIZE,
-                height: STAGE_SIZE,
-                transform: [{ scale: STAGE_ZOOM }],
-              }}
-              source={require('@/assets/anim/walk-blue.webp')}
-              contentFit="cover"
-            />
-          </View>
+          <Image
+            style={{
+              height: STAGE_SIZE * 0.82,
+              width: STAGE_SIZE * 0.82 * WALK_ASPECT,
+            }}
+            source={require('@/assets/anim/walk-transparent.webp')}
+            contentFit="contain"
+          />
         </View>
 
         <ThemedText type="subtitle" style={styles.appName}>
