@@ -44,6 +44,22 @@ export async function getLearnedToday(dateKey = todayKey()): Promise<Set<string>
   return new Set(map[dateKey] ?? []);
 }
 
+/**
+ * 撤销"今日已学"(从生词本移出时调用)。
+ *
+ * 为什么需要:"今日新学"与"加入生词本"绑定之后,用户可能在加错后立刻移出,
+ * 计数器不该留着那一笔。只撤销**今天**的记录 —— 昨天学过的词今天移出,
+ * 不该影响昨天的历史。
+ */
+export async function unmarkLearnedToday(headword: string, dateKey = todayKey()): Promise<void> {
+  const key = headword.toLowerCase();
+  const map = await readLearning();
+  const list = map[dateKey] ?? [];
+  if (!list.includes(key)) return;
+  const next = { ...map, [dateKey]: list.filter((w) => w !== key) };
+  await AsyncStorage.setItem(LEARNING_KEY, JSON.stringify(next));
+}
+
 /** 全部学过的词(跨日期,小写 set) */
 export async function getAllLearned(): Promise<Set<string>> {
   const map = await readLearning();

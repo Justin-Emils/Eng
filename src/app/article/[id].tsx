@@ -27,7 +27,7 @@ import { splitSentences, extractWords } from '@/domain/wordmark';
 import { isStudyCandidate } from '@/domain/wordlevel';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import { addCheckin } from '@/storage/checkins';
-import { getAllKnown, getAllLearned, getLearnedToday, markKnown, markLearned } from '@/storage/learning';
+import { getAllKnown, getAllLearned, getLearnedToday } from '@/storage/learning';
 import { getReadingProgress, markArticleCompleted, saveReadingProgress } from '@/storage/progress';
 import { getUserLevel } from '@/storage/user';
 
@@ -55,7 +55,6 @@ export default function ArticleReaderScreen() {
   const [dictResult, setDictResult] = useState<LookupResult | null>(null);
   const [dictVisible, setDictVisible] = useState(false);
   const [dictKaoyan, setDictKaoyan] = useState(false);
-  const [dictStudyState, setDictStudyState] = useState<'candidate' | 'learned' | 'known' | null>(null);
   // 点词时所在句子:收藏生词时记作 sourceSentence,供复习例句/详情使用
   const [pendingSentence, setPendingSentence] = useState<string | undefined>(undefined);
   const [completed, setCompleted] = useState(false);
@@ -179,19 +178,18 @@ export default function ArticleReaderScreen() {
         result = offlineDictionary.lookup(word);
         cache.set(key, result);
       }
-      // 学习状态:已学(今日或历史)> 已会 > 候选生词 > 无
-      const isKnownWord = knownSet.has(key);
-      const isLearned = learnedSet.has(key);
+      /**
+       * 是否命中考研词表(卡片上仍显示这个标记)。
+       * 原来这里还算了一套"候选 / 已学 / 已会"状态给卡片上的两个按钮用,
+       * 那两个按钮已删(今日新学改由"加入生词本"驱动、掌握判定交给复习),故一并去掉。
+       */
       const isCandidate = isStudyCandidate(word, userVocab);
-      setDictStudyState(
-        isLearned ? 'learned' : isKnownWord ? 'known' : isCandidate ? 'candidate' : null,
-      );
       setDictKaoyan(isCandidate);
       setPendingSentence(sentence);
       setDictResult(result);
       setDictVisible(true);
     },
-    [knownSet, learnedSet, userVocab],
+    [userVocab],
   );
 
   if (!article) {
@@ -221,22 +219,6 @@ export default function ArticleReaderScreen() {
   ];
   const chips = [...meta, ...article.topicTags];
 
-  /** 标记今日学习(进入学习流;正文立即加粗并从候选蓝中移除) */
-  const handleMarkLearned = async (headword: string) => {
-    await markLearned(headword);
-    const lower = headword.toLowerCase();
-    setLearnedSet((prev) => new Set([...prev, lower]));
-    setLearnedToday((prev) => new Set([...prev, lower]));
-    setDictStudyState('learned');
-  };
-
-  /** 标记"我已会"(不再当作生词) */
-  const handleMarkKnown = async (headword: string) => {
-    await markKnown(headword);
-    const lower = headword.toLowerCase();
-    setKnownSet((prev) => new Set([...prev, lower]));
-    setDictStudyState('known');
-  };
 
   const finishArticle = async () => {
     if (!article || completedRef.current) return;
@@ -442,9 +424,6 @@ export default function ArticleReaderScreen() {
         visible={dictVisible}
         source={{ articleId: article.id, sentence: pendingSentence }}
         kaoyan={dictKaoyan}
-        studyState={dictStudyState}
-        onMarkLearned={(headword) => void handleMarkLearned(headword)}
-        onMarkKnown={(headword) => void handleMarkKnown(headword)}
         onOpenDetail={(headword) => {
           setDictVisible(false);
           router.push({ pathname: '/word/[word]', params: { word: headword, articleId: article.id } });

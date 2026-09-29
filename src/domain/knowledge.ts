@@ -22,13 +22,32 @@ const UNKNOWN_THRESHOLD = 12000;
 const PROB_MIN = 0.01;
 const PROB_MAX = 0.995;
 
+/** 曲线锚点:一个门槛档位上的实测掌握率 */
+export interface CurveAnchor {
+  threshold: number;
+  rate: number;
+  /** 该锚点是否由**复习**实测结果校准而来(用于说明与展示) */
+  review?: boolean;
+}
+
+/**
+ * 复习的分档战况(结构上与 storage/review-stats 一致)。
+ * 定义在这里而不是 storage:domain 保持"只做计算",调用方把数据传进来。
+ */
+export type ReviewBandStats = Record<number, { known: number; total: number }>;
+
+/** 参与校准所需的最少作答数:低于此不参与,避免 2~3 个样本把曲线拽歪 */
+export const REVIEW_MIN_SAMPLES = 5;
+/** 收缩强度(伪计数):越大越向评估曲线靠,4 表示约等于 4 个虚拟样本 */
+const REVIEW_SHRINK = 4;
+
 export interface KnowledgeCurve {
   /** 认识"门槛为 t 的词"的概率(0–1,单调不增) */
   pKnown: (threshold: number) => number;
-  /** 曲线来源:评估明细拟合 / 默认 logistic */
-  source: 'assessment' | 'default';
-  /** 展示用锚点(评估各档的实测正确率) */
-  anchors: { threshold: number; rate: number }[];
+  /** 曲线来源:评估拟合 / 评估+复习校准 / 默认 logistic */
+  source: 'assessment' | 'assessment+review' | 'default';
+  /** 展示用锚点(评估各档实测正确率,复习校准过的会被替换) */
+  anchors: CurveAnchor[];
 }
 
 function clampProb(p: number): number {
@@ -53,8 +72,15 @@ export function defaultCurve(vocab: number): KnowledgeCurve {
  * 由评估明细拟合曲线(分段线性 + 两端外推)。
  * 为什么不用 logistic 回归:锚点通常只有 3–5 个,拟合出的参数不稳健;
  * 分段线性至少能保证"评估测到的档位一定穿过实测正确率",不会骗人。
+ *
+ * @param reviewStats 复习的分档战况(可选)。给了就用它校准对应档位 ——
+ *   评估是一次性的窄样本,而复习是持续发生的真实学习行为,应当反哺曲线。
  */
-export function curveForLevel(level: UserLevel, fallbackVocab?: number): KnowledgeCurve {
+export function curveForLevel(
+  level: UserLevel,
+  fallbackVocab?: number,
+  reviewStats?: ReviewBandStats,
+): KnowledgeCurve {
   const rounds = level.rounds ?? [];
   if (rounds.length === 0) {
     return defaultCurve(level.vocab ?? fallbackVocab ?? 3000);
@@ -73,8 +99,10 @@ export function curveForLevel(level: UserLevel, fallbackVocab?: number): Knowled
 
   if (anchors.length === 0) return defaultCurve(level.vocab ?? fallbackVocab ?? 3000);
 
-  const first = anchors[0];
-  const last = anchors[anchors.length - 1];
+  // 把复习的实测结果并进锚点(见下方 mergeReviewStats)
+  const mergedAnchors = mergeReviewStats(anchors, reviewStats);
+  const first = mergedAnchors[0];
+  const last = mergedAnchors[mergedAnchors.length - 1];
 
   const pKnown = (t: number): number => {
     // 低于最低作答档:不低于实测值,但也不给满分(没测到的高频词仍可能不会)
@@ -85,10 +113,10 @@ export function curveForLevel(level: UserLevel, fallbackVocab?: number): Knowled
       return clampProb(last.rate * Math.exp(-(t - last.threshold) / scale));
     }
     // 锚点之间线性插值
-    for (let i = 1; i < anchors.length; i += 1) {
-      const hi = anchors[i];
+    for (let i = 1; i < mergedAnchors.length; i += 1) {
+      const hi = mergedAnchors[i];
       if (t <= hi.threshold) {
-        const lo = anchors[i - 1];
+        const lo = mergedAnchors[i - 1];
         const ratio = (t - lo.threshold) / Math.max(1, hi.threshold - lo.threshold);
         return clampProb(lo.rate + ratio * (hi.rate - lo.rate));
       }
@@ -96,7 +124,68 @@ export function curveForLevel(level: UserLevel, fallbackVocab?: number): Knowled
     return clampProb(last.rate);
   };
 
-  return { pKnown, source: 'assessment', anchors };
+  return {
+    pKnown,
+    source: mergedAnchors.some((a) => a.review) ? 'assessment+review' : 'assessment',
+    anchors: mergedAnchors,
+  };
+}
+
+/**
+ * 把复习的分档战况并进锚点(复习校准)。
+ *
+ * 两个约束,都是为了防止"用很少的样本把曲线拽歪":
+ *  1. **样本门槛**:某档作答数 < REVIEW_MIN_SAMPLES 就不参与;
+ *  2. **收缩**:把复习实测正确率与评估曲线在该档的取值按伪计数加权
+ *     —— 答得越多,越信复习;答得少,基本还是评估那条线。
+ *
+ * 注意复习数据是**有偏样本**里的无偏用法:个人词表收的都是"当时不会的词",
+ * 直接拿它估整体水平会偏低;这里只用它修正**所在档位的掌握率**,
+ * 且被评估曲线拉着,所以不会把曲线拽塌。
+ */
+function mergeReviewStats(
+  anchors: CurveAnchor[],
+  stats?: ReviewBandStats,
+): CurveAnchor[] {
+  if (!stats) return anchors;
+  const bands = Object.entries(stats)
+    .map(([bandKey, s]) => ({ threshold: Number(bandKey), ...s }))
+    .filter((s) => Number.isFinite(s.threshold) && s.total >= REVIEW_MIN_SAMPLES);
+  if (bands.length === 0) return anchors;
+
+  const out: CurveAnchor[] = [...anchors];
+  for (const band of bands) {
+    const baseRate = evaluateAnchors(anchors, band.threshold);
+    const observed = band.known / band.total;
+    // 收缩:复习实测正确率与评估曲线取值按伪计数加权(答得越多越信复习)
+    const shrunk =
+      (observed * band.total + REVIEW_SHRINK * baseRate) / (band.total + REVIEW_SHRINK);
+    const at = out.findIndex((a) => a.threshold === band.threshold);
+    const anchor: CurveAnchor = { threshold: band.threshold, rate: shrunk, review: true };
+    if (at >= 0) out[at] = anchor;
+    else out.push(anchor);
+  }
+  return out.sort((a, b) => a.threshold - b.threshold);
+}
+
+/** 在锚点之间取值(与 pKnown 的插值规则一致,单独抽出来供校准复用) */
+function evaluateAnchors(anchors: CurveAnchor[], t: number): number {
+  const first = anchors[0];
+  const last = anchors[anchors.length - 1];
+  if (t <= first.threshold) return clampProb(Math.min(0.99, Math.max(first.rate, 0.9)));
+  if (t >= last.threshold) {
+    const scale = Math.max(500, last.threshold * 0.5);
+    return clampProb(last.rate * Math.exp(-(t - last.threshold) / scale));
+  }
+  for (let i = 1; i < anchors.length; i += 1) {
+    const hi = anchors[i];
+    if (t <= hi.threshold) {
+      const lo = anchors[i - 1];
+      const ratio = (t - lo.threshold) / Math.max(1, hi.threshold - lo.threshold);
+      return clampProb(lo.rate + ratio * (hi.rate - lo.rate));
+    }
+  }
+  return clampProb(last.rate);
 }
 
 /** 单词的"认识概率";词典没覆盖的词按最难的档位估(偏保守) */

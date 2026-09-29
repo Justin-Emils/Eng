@@ -17,6 +17,7 @@ import { hydrateRemoteArticles } from '@/data/articles/remote-registry';
 import { bandLabelOf, CEFR_REPRESENTATIVE_VOCAB } from '@/domain/levels';
 import { recommendFor } from '@/domain/recommend';
 import { curveForLevel } from '@/domain/knowledge';
+import { getReviewStatsSync } from '@/storage/review-stats';
 import { computeStreak } from '@/domain/stats';
 import { useCompletedArticleIds } from '@/hooks/use-completed-articles';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
@@ -160,7 +161,7 @@ export default function TodayScreen() {
   );
 
   /** 掌握概率曲线:用评估各档实测正确率拟合,推荐按概率加权理解率匹配 */
-  const curve = useMemo(() => curveForLevel(userLevel, userVocab), [userLevel, userVocab]);
+  const curve = useMemo(() => curveForLevel(userLevel, userVocab, getReviewStatsSync()), [userLevel, userVocab]);
 
   const picks = useMemo(
     () =>

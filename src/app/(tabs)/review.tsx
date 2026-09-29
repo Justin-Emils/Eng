@@ -19,6 +19,7 @@ import {
   type ReviewOutcome,
 } from '@/domain/srs';
 import { getAllLearningWords, getDueWords, updateWordReview } from '@/storage/words';
+import { recordReviewResult } from '@/storage/review-stats';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import type { WordItem } from '@/types';
 
@@ -151,6 +152,8 @@ export default function ReviewScreen() {
     const outcome = readOutcome(current, grade, next);
     const updated: WordItem = { ...current, status: next.status, review: next.review };
     await updateWordReview(updated);
+    // 复习结果反哺知识曲线(按词所在的档位累积,见 storage/review-stats)
+    await recordReviewResult(current.headword, grade === 'good');
     setTally((t) => ({
       ...t,
       total: t.total + 1,
@@ -181,6 +184,9 @@ export default function ReviewScreen() {
     const outcome = readOutcome(current, 'again', next);
     const updated: WordItem = { ...current, status: next.status, review: next.review };
     await updateWordReview(updated);
+    // 改判:撤掉刚才那笔「记得」再记一笔「不记得」,账才对得上
+    await recordReviewResult(current.headword, true, true);
+    await recordReviewResult(current.headword, false);
     if (!requeuedRef.current.has(updated.id)) {
       requeuedRef.current.add(updated.id);
       setQueue((q) => [...q, updated]);

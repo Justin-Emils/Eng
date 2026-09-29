@@ -6,6 +6,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { markLearned, unmarkLearnedToday } from '@/storage/learning';
+
 import { makeWordItem, type NewWordInput } from '@/domain/words';
 import { isDue } from '@/domain/srs';
 import type { WordItem } from '@/types';
@@ -120,10 +122,26 @@ export async function toggleWordSave(input: NewWordInput): Promise<boolean> {
   if (wasSaved) {
     const next = words.filter((w) => w.headword !== headword);
     await AsyncStorage.setItem(WORDS_KEY, JSON.stringify(next));
+    // 移出时撤销今日的"今日新学"记录(只撤今天,不动历史)
+    await unmarkLearnedToday(headword);
     return false;
   }
   const item = makeWordItem(input);
   await AsyncStorage.setItem(WORDS_KEY, JSON.stringify([item, ...words]));
+
+  /**
+   * **加入生词本 = 今日新学 +1**(反馈明确要求绑定)。
+   *
+   * 以前是两套:CSS 卡片上有个「今日学习」按钮走 learning 存储,「＋ 生词本」走 words 存储,
+   * 互不相干 —— 于是"今日新学"只是一个没有痕迹的计数,同一个词第二天还能再标一次。
+   * 现在统一由"加入生词本"这一个动作驱动:
+   *   · 今日新学计数 = 今天加入的词(learned-today 集合,供首页计数与阅读页标蓝用);
+   *   · 痕迹 = 生词本本身(能看到自己收了什么,而不是数字闪过就没了)。
+   * 注:WordItem 已有 addedAt 字段,将来若想彻底去掉 learning 存储,
+   * 可直接按 addedAt 派生"今日新学";这里保留 learning 是因为它还承担
+   * "已学过的词不再标蓝"的判定,换源需要一起改阅读页。
+   */
+  await markLearned(headword);
   return true;
 }
 

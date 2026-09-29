@@ -13,6 +13,7 @@ import { getAllArticles, getArticleById } from '@/data/articles';
 import { computeStats, type LearningStats } from '@/domain/analytics';
 import { bandLabelOf, DEFAULT_USER_VOCAB } from '@/domain/levels';
 import { curveForLevel } from '@/domain/knowledge';
+import { getReviewStatsSync } from '@/storage/review-stats';
 import { buildLearnerProfile, bandRoi, type LearnerProfile } from '@/domain/profile';
 import { computeStreak } from '@/domain/stats';
 import { useAuth } from '@/hooks/use-auth';
@@ -118,7 +119,7 @@ export default function ProfileScreen() {
             totalArticlesCompleted: nextStats.totalArticlesCompleted,
             totalWordsRead: nextStats.totalWordsRead,
           },
-          roi: bandRoi(level.vocab ?? DEFAULT_USER_VOCAB, getAllArticles(), curveForLevel(level)),
+          roi: bandRoi(level.vocab ?? DEFAULT_USER_VOCAB, getAllArticles(), curveForLevel(level, undefined, getReviewStatsSync())),
         }),
       );
     };

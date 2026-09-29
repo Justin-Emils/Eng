@@ -10,7 +10,7 @@ import { offlineDictionary } from '@/domain/dictionary';
 import { isExternalWord } from '@/domain/external';
 import { useTheme } from '@/hooks/use-theme';
 import { useWordSaved } from '@/hooks/use-word-saved';
-import { getWords, removeWord, setWordStatus } from '@/storage/words';
+import { getWords, removeWord } from '@/storage/words';
 import type { WordItem } from '@/types';
 
 /**
@@ -50,15 +50,7 @@ export default function WordDetailScreen() {
     };
   }, [saved, headword]);
 
-  const mastered = wordItem?.status === 'mastered';
 
-  /** 标记已掌握 / 取消掌握(从生词本的主动操作移到这里) */
-  const handleToggleMastered = async () => {
-    if (!wordItem) return;
-    await setWordStatus(wordItem.id, mastered ? 'learning' : 'mastered');
-    const list = await getWords();
-    setWordItem(list.find((w) => w.id === wordItem.id) ?? null);
-  };
 
   /** 从生词本删除(不可恢复,二次确认) */
   const handleRemove = () => {
@@ -221,15 +213,7 @@ export default function WordDetailScreen() {
         {/* 生词管理(从生词本列表行移到详情页,避免列表里挤两个功能相近的按钮) */}
         {wordItem ? (
           <View style={styles.manageRow}>
-            <Pressable
-              onPress={() => void handleToggleMastered()}
-              style={({ pressed }) => [styles.manageBtnWrap, pressed && styles.pressed]}>
-              <ThemedView type="backgroundElement" style={styles.manageBtn}>
-                <ThemedText type="smallBold" themeColor={mastered ? 'textSecondary' : 'accent'}>
-                  {mastered ? '取消已掌握' : '标为已掌握'}
-                </ThemedText>
-              </ThemedView>
-            </Pressable>
+
             <Pressable
               onPress={handleRemove}
               style={({ pressed }) => [styles.manageBtnWrap, pressed && styles.pressed]}>

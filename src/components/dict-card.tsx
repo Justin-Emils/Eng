@@ -26,9 +26,6 @@ export function DictCard({
   onOpenDetail,
   onClose,
   kaoyan = false,
-  studyState = null,
-  onMarkLearned,
-  onMarkKnown,
 }: {
   result: LookupResult | null;
   visible: boolean;
@@ -38,11 +35,8 @@ export function DictCard({
   onClose: () => void;
   /** 是否命中考研/外部词表(旧标记,保持兼容) */
   kaoyan?: boolean;
-  /** 学习状态:candidate=候选生词;learned=已学;known=已会 */
-  studyState?: 'candidate' | 'learned' | 'known' | null;
-  onMarkLearned?: (headword: string) => void;
-  onMarkKnown?: (headword: string) => void;
 }) {
+
   const theme = useTheme();
   const entry = result?.entry;
   /**
@@ -155,41 +149,14 @@ export function DictCard({
               </>
             )}
 
-            {/* 学习状态区:候选生词 → 邀请加入今日学习;已学/已会 → 状态徽章
-                (未收录的词同样可以标记学习:它可能正是超出词表的生词) */}
-            {studyState ? (
-              studyState === 'candidate' ? (
-                <View style={styles.studyRow}>
-                  <ThemedText type="small" themeColor="textSecondary" style={styles.studyHint}>
-                    高于你当前词汇量,值得学
-                  </ThemedText>
-                  <Pressable
-                    onPress={() => onMarkLearned?.(displayWord)}
-                    style={({ pressed }) => pressed && styles.pressed}>
-                    <ThemedView type="backgroundSelected" style={styles.smallBtn}>
-                      <ThemedText type="smallBold" themeColor="accent">
-                        ＋ 今日学习
-                      </ThemedText>
-                    </ThemedView>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => onMarkKnown?.(displayWord)}
-                    style={({ pressed }) => pressed && styles.pressed}>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      我会了
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              ) : (
-                <View style={styles.studyRow}>
-                  <ThemedView type="backgroundSelected" style={styles.smallBtn}>
-                    <ThemedText type="smallBold" themeColor="accent">
-                      {studyState === 'learned' ? '✓ 今日已学' : '✓ 已认识'}
-                    </ThemedText>
-                  </ThemedView>
-                </View>
-              )
-            ) : null}
+            {/*
+              这里原来有「＋ 今日学习」「我会了」两个按钮,现已删除:
+              · 加入生词本即等于今日新学 +1(见 storage/words.ts 的 toggleWordSave),
+                不再需要一个专门标记"今日学习"的按钮;
+              · 「我会了」的判定改由复习流程承担 —— 生词本只负责"收",
+                是否掌握由复习的自评结果决定(见 domain/srs 与复习页),
+                这样知识曲线才有一个可信的数据来源,而不是靠随手一个按钮。
+            */}
 
             {/* 小按钮行:详情 / 收藏 / 关闭(未收录词也允许详情与收藏) */}
             <View style={styles.actions}>
