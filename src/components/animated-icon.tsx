@@ -22,34 +22,18 @@ import { useTheme } from '@/hooks/use-theme';
 const MIN_SHOW_MS = 1300;
 
 /**
- * 舞台圆盘直径(角色动画的容器):按屏宽 68%(上限 280)。
- *
- * 为什么要用一个**圆形**容器装动画,而不是直接铺满:见下面 SPLASH_STAGE 的说明。
- */
-const STAGE_SIZE = Math.min(Math.round(Dimensions.get('screen').width * 0.68), 280);
-
-/**
- * 角色动画用 `assets/anim/walk-transparent.webp`:**带透明通道**,不挑底色。
- *
- * 它是怎么来的(以前这里写着"没有 ffmpeg、做不出透明版",那是不对的):
- *   1. 素材 `character.webm` 是「浅色角色 + 纯黑背景」的 AV1 视频,没有 alpha;
- *   2. ffmpeg(Anaconda 的 imageio_ffmpeg 里带了一个)逐帧导出 PNG,用**亮度作 alpha**:
- *      `alphamerge` 把灰度通道并成透明度 —— 黑底自然全透明,角色边缘保留抗锯齿;
- *   3. **不能用 ffmpeg 直接转 WebP**:动图 WebP 的帧间混合不会擦除上一帧的透明区,
- *      会出现"每一帧叠加"的鬼影(旧版 walk-white/walk-dark 就是这么坏的:
- *      实测内容像素从 14582 单调涨到 19060)。所以改用 Pillow 逐帧完整写入;
- *   4. Pillow 写动图时 `quality` 基本不起作用(实测 78→50 只差 200 KB,走的无损路径),
- *      而亮度渐变出来的软边极难无损压缩(2.8 MB)。把 alpha **二值化**后降到 881 KB。
- *
- * 尺寸:按所有帧的**并集包围盒**裁到 235×333(原 720×720 的 15% 像素)——
- * 走动时角色会左右摆,只按单帧裁会切到手脚。
- */
-const WALK_ASPECT = 235 / 333;
-
-/**
  * 启动遮罩。
  *
  * 配色全部取自当前主题(背景、幕布轨、标题、加载点),所以换主题时启动屏跟着变。
+ *
+ * 角色行走动画已按反馈**移除**:素材是"浅色角色 + 纯黑背景"且无色键信息,
+ * 抠底调了七版(v1 亮度作 alpha → v6 OpenCV 连通域 → v7 补被包围的纯黑 + 软边),
+ * 仍反复出现瑕疵(深色部位被抠、后脑残留黑斑、边缘锯齿),先不折腾。
+ * 素材与工具都留在仓库里:assets/anim/walk-transparent.webp;
+ * scripts/gen-walk-mask6.py(连通域抠底)/ gen-walk-mask7.py(软边版)/
+ * anim-alpha-check.py(把透明区染成洋红做诊断)。
+ * 要加回来时,在 styles.content 里放一个 Image 指向该文件即可;
+ * 注意它当前**没有被 require**,所以不会打进包(APK 因此约省 1 MB)。
  *
  * ⚠️ 与它配套的**原生**启动屏(`app.json` 里 expo-splash-screen 的 backgroundColor)
  * 是构建期常量,**无法跟随运行时主题**,只能对齐到一套配色。那里对齐的是叙拉古主题
@@ -100,30 +84,7 @@ export function AnimatedSplashOverlay({ ready = true }: { ready?: boolean }) {
       />
 
       <View style={styles.content}>
-        {/*
-          舞台:圆裁剪 + 金线描边。底色取主题的 accentSoft(以前这里写死品牌蓝 ——
-          因为那时动画自带宽底;现在动画是透明的,圆盘只是一个设计元素,自然跟着主题走)。
-        */}
-        <View
-          style={[
-            styles.stage,
-            {
-              width: STAGE_SIZE,
-              height: STAGE_SIZE,
-              borderRadius: STAGE_SIZE / 2,
-              borderColor: theme.gold,
-              backgroundColor: theme.accentSoft,
-            },
-          ]}>
-          <Image
-            style={{
-              height: STAGE_SIZE * 0.82,
-              width: STAGE_SIZE * 0.82 * WALK_ASPECT,
-            }}
-            source={require('@/assets/anim/walk-transparent.webp')}
-            contentFit="contain"
-          />
-        </View>
+        {/* 角色行走动画已移除(见组件头注释):这里不再有圆盘与图片 */}
 
         <ThemedText type="subtitle" style={styles.appName}>
           考研英语阅读
