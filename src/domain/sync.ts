@@ -12,7 +12,9 @@ import { REST_BASE, SUPABASE_KEY } from '@/config/backend';
 import { AuthError } from '@/domain/auth/api';
 import { ensureAccessToken, getAuthState } from '@/domain/auth/store';
 import { exportBackup, importBackup } from '@/domain/backup';
+import { checkOwnership, type OwnershipCheck } from '@/domain/ownership';
 import { DEFAULT_AVATAR, getAccount, saveAccount } from '@/storage/account';
+import { bindLocalOwner, getLocalOwnerSync } from '@/storage/local-owner';
 import { getSettings } from '@/storage/settings';
 import { getWords } from '@/storage/words';
 
@@ -107,9 +109,53 @@ function countWords(raw: string): number {
   }
 }
 
+/**
+ * 本机数据归属不匹配时抛出的错误(B2)。
+ * 带上判定结果,界面可以直接引用里面的说法,不必自己拼文案。
+ */
+export class OwnershipError extends Error {
+  readonly check: OwnershipCheck;
+
+  constructor(check: OwnershipCheck) {
+    super(check.message);
+    this.name = 'OwnershipError';
+    this.check = check;
+  }
+}
+
+function accountEmail(): string {
+  return getAuthState().session?.user.email ?? '';
+}
+
+/**
+ * 当前登录账号与本机数据的归属关系(供上传前的校验与账号页展示复用)。
+ * 「本机有没有数据」用生词数量判断:有生词才谈得上"把谁的数据推到谁的账号"。
+ */
+export async function getOwnershipStatus(): Promise<OwnershipCheck> {
+  const words = await getWords();
+  return checkOwnership({
+    owner: getLocalOwnerSync(),
+    accountId: currentUserId(),
+    accountEmail: accountEmail(),
+    localHasData: words.length > 0,
+  });
+}
+
 /** 把本机数据整份上传(已存在则覆盖) */
 export async function pushBackup(): Promise<void> {
   const userId = currentUserId();
+  const check = await getOwnershipStatus();
+  /**
+   * **B2 硬约束**:本机数据只能属于一个账号。
+   * 归属是另一个账号时拒绝上传 —— 这正是以前"两个号内容一样"的根因:
+   * 本机数据能反复推到不同账号。要改归属必须由用户在账号页明确选择。
+   */
+  if (!check.canUpload) throw new OwnershipError(check);
+  // 首次上传:数据还没有归属,绑定到当前账号
+  if (check.state === 'unbound') {
+    await bindLocalOwner({ accountId: userId, email: accountEmail() });
+  }
+
   const raw = await exportBackup();
   await rest('/backups', {
     method: 'POST',
@@ -143,9 +189,24 @@ export async function pullBackup(): Promise<RemoteBackup | null> {
   };
 }
 
-/** 用云端备份覆盖本机(返回写入的键数量) */
+/** 用云端备份覆盖本机(返回写入的键数量);覆盖后本机数据的归属改绑到该账号 */
 export async function restoreFromCloud(backup: RemoteBackup): Promise<number> {
-  return importBackup(backup.raw);
+  const userId = currentUserId();
+  const count = await importBackup(backup.raw);
+  // 本机内容现在等于这个账号的备份,归属随之改绑(这是**恢复**的语义,不是静默改绑)
+  await bindLocalOwner({ accountId: userId, email: accountEmail() });
+  return count;
+}
+
+/**
+ * 把本机数据改归当前账号并上传(账号页的明确操作,对应 B2 的"改绑")。
+ * 与 pushBackup 的区别:这里**先改绑再上传**,所以能通过归属校验 ——
+ * 换句话说,"把本机数据给另一个账号"这件事只能由用户主动点这一下。
+ */
+export async function adoptLocalDataToCurrentAccount(): Promise<void> {
+  const userId = currentUserId();
+  await bindLocalOwner({ accountId: userId, email: accountEmail() });
+  await pushBackup();
 }
 
 /** 上传昵称 / 头像(登录后个人资料也进云端,换手机才带得走) */
@@ -215,6 +276,8 @@ export async function autoSyncAfterLogin(): Promise<{ restored: boolean; note: s
   }
 
   const count = await importBackup(remote.raw);
+  // 本机内容已等于该账号的备份 → 归属绑定到这个账号(新手机首次登录的典型路径)
+  await bindLocalOwner({ accountId: currentUserId(), email: accountEmail() });
   return {
     restored: true,
     note: `已从云端恢复 ${count} 项数据(${remote.wordCount} 个生词)`,

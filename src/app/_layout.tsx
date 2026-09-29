@@ -14,6 +14,8 @@ import { autoSyncAfterLogin } from '@/domain/sync';
 import { useResolvedScheme, useTheme } from '@/hooks/use-theme';
 import { hydrateThemePrefs } from '@/hooks/use-theme-pref';
 import { getSettings } from '@/storage/settings';
+import { hydrateLocalOwner } from '@/storage/local-owner';
+import { hydrateReviewStats } from '@/storage/review-stats';
 import { migrateStorageIfNeeded } from '@/storage/words';
 
 SplashScreen.preventAutoHideAsync();
@@ -49,6 +51,14 @@ export default function RootLayout() {
     void (async () => {
       // 主题模式先水化,避免首帧用错配色(深浅模式与主题 id 一起读)
       await hydrateThemePrefs();
+      /**
+       * 复习校准数据与本机数据归属:两者都参与**同步判断**(曲线是同步算的、
+       * 上传前要校验归属),所以必须在首屏之前读完。
+       * 注:上一次加 hydrateReviewStats 时锚点写错(旧函数名 hydrateThemeMode),
+       * 替换没生效 —— 复习校准因此一直没读到数据,已一并修正。
+       */
+      await hydrateReviewStats();
+      await hydrateLocalOwner();
       const settings = await getSettings();
       let onboarded = settings.onboarded;
 

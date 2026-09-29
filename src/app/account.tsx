@@ -15,7 +15,9 @@ import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { isImageAvatar, pickAvatarFromLibrary } from '@/domain/avatar';
 import { signOut } from '@/domain/auth/store';
 import { describeBackup, exportBackup, importBackup } from '@/domain/backup';
-import { pullBackup, pushBackup, pushProfile, restoreFromCloud } from '@/domain/sync';
+import { adoptLocalDataToCurrentAccount, getOwnershipStatus, pullBackup, pushBackup, pushProfile, restoreFromCloud } from '@/domain/sync';
+import type { OwnershipCheck } from '@/domain/ownership';
+import { clearLocalOwner } from '@/storage/local-owner';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import {
@@ -77,6 +79,8 @@ export default function AccountScreen() {
   const [syncBusy, setSyncBusy] = useState(false);
   const [syncNote, setSyncNote] = useState<string | null>(null);
   const [cloud, setCloud] = useState<CloudStatus>({ kind: 'idle' });
+  /** 本机数据的归属状态(B2):未绑定 / 属于当前账号 / 与当前账号冲突 */
+  const [ownership, setOwnership] = useState<OwnershipCheck | null>(null);
 
   /**
    * 主动去云端读一次备份概况 —— 这是"上传是否真的成功"的独立证据:
@@ -122,6 +126,81 @@ export default function AccountScreen() {
       active = false;
     };
   }, []);
+
+  /**
+   * 归属状态(B2):登录状态变化时读一次。
+   * 所有 setState 都在 await 之后,避免 effect 里的同步 setState。
+   */
+  useEffect(() => {
+    void (async () => {
+      await Promise.resolve();
+      if (auth.status !== 'authed') {
+        setOwnership(null);
+        return;
+      }
+      try {
+        setOwnership(await getOwnershipStatus());
+      } catch {
+        setOwnership(null);
+      }
+    })();
+  }, [auth.status]);
+
+  /**
+   * 把本机数据改归当前账号并上传(B2 的"改绑")。
+   * 这是唯一允许"本机数据从一个账号转到另一个账号"的入口,且必须用户明确点击 ——
+   * 上传本身(handleCloudUpload)在归属冲突时会被拒绝。
+   */
+  const handleAdoptLocal = () => {
+    const target = auth.session?.user.email ?? '当前账号';
+    Alert.alert(
+      '把本机数据改归当前账号?',
+      `本机数据将绑定到 ${target},并整份上传到它的云端。\n\n原账号(${ownership?.ownerEmail || '另一个账号'})的云端备份不会被删除,但本机从此只属于 ${target}。`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '改归并上传',
+          onPress: () => {
+            void (async () => {
+              setSyncBusy(true);
+              setSyncNote(null);
+              try {
+                await adoptLocalDataToCurrentAccount();
+                setSyncNote(`✓ 本机数据已改归 ${target} 并上传`);
+                setOwnership(await getOwnershipStatus());
+                await refreshCloud();
+              } catch (e) {
+                setSyncNote(`✗ 改归失败:${e instanceof Error ? e.message : '未知错误'}`);
+              } finally {
+                setSyncBusy(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
+  /** 解除本机归属:数据全部保留,之后可以再绑到任意账号 */
+  const handleClearOwner = () => {
+    Alert.alert(
+      '解除本机数据的归属?',
+      '本机数据会完整保留,只是不再属于任何账号 —— 下次上传时会重新绑定到当时登录的账号。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '解除归属',
+          onPress: () => {
+            void (async () => {
+              await clearLocalOwner();
+              setOwnership(await getOwnershipStatus());
+              setSyncNote('已解除归属,本机数据保留');
+            })();
+          },
+        },
+      ],
+    );
+  };
 
   const pickAvatar = async (emoji: string) => {
     const next = await saveAccount({ avatar: emoji });
@@ -428,9 +507,46 @@ export default function AccountScreen() {
               ) : (
                 <SettingRow label="云端状态" value="读取中…" />
               )}
+              {/*
+                数据归属(B2):本机数据只能绑一个账号。
+                冲突时把两个"明确选择"摆在这里,而不是让用户在别处猜怎么处理。
+              */}
+              <SettingRow
+                label="本机数据归属"
+                sublabel={ownership?.message ?? '读取中…'}
+                value={
+                  ownership?.state === 'same'
+                    ? '✓ 当前账号'
+                    : ownership?.state === 'conflict'
+                      ? '⚠ 冲突'
+                      : '未绑定'
+                }
+              />
+              {ownership?.state === 'conflict' ? (
+                <>
+                  <SettingRow
+                    label="把本机数据改归当前账号"
+                    sublabel="绑定到当前账号,并整份上传到它的云端"
+                    value={syncBusy ? '处理中…' : '改归 ›'}
+                    onPress={() => {
+                      if (!syncBusy) handleAdoptLocal();
+                    }}
+                  />
+                  <SettingRow
+                    label="解除本机归属"
+                    sublabel="本机数据完整保留,之后可再绑到任意账号"
+                    value="解绑 ›"
+                    onPress={handleClearOwner}
+                  />
+                </>
+              ) : null}
               <SettingRow
                 label="上传本机数据到云端"
-                sublabel="把生词本、进度、设置整份推到云端(覆盖云端旧备份)"
+                sublabel={
+                  ownership?.state === 'conflict'
+                    ? '当前归属是另一个账号,上传已被阻止(见上行)'
+                    : '把生词本、进度、设置整份推到云端(覆盖云端旧备份)'
+                }
                 value={syncBusy ? '处理中…' : '上传 ›'}
                 onPress={() => {
                   if (!syncBusy) void handleCloudUpload();

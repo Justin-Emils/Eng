@@ -10,6 +10,8 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { bindLocalOwner, getLocalOwnerSync } from '@/storage/local-owner';
+
 /** 需要备份的存储键(与各 storage 模块保持一致) */
 /**
  * 备份的键白名单 —— **只放用户数据**。
@@ -38,6 +40,15 @@ export interface BackupPayload {
   app: 'article-reading';
   version: number;
   exportedAt: string;
+  /**
+   * 这份数据原本属于哪个账号(B2/B5 的跨设备校验)。
+   *
+   * 为什么必须带:备份是可以随便转发的 JSON —— 把导出的备份发给别人导入,
+   * 对方就能凭空得到一份完全相同的数据。有了归属 id,导入时就能判断
+   * "这份备份是不是你的";不一致时默认拒绝,要求明确确认。
+   */
+  ownerId?: string | null;
+  ownerEmail?: string;
   /** key → 原始字符串值 */
   data: Record<string, string>;
 }
@@ -53,6 +64,8 @@ export async function exportBackup(): Promise<string> {
     app: 'article-reading',
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
+    ownerId: getLocalOwnerSync()?.accountId ?? null,
+    ownerEmail: getLocalOwnerSync()?.email ?? '',
     data,
   };
   return JSON.stringify(payload);
@@ -83,7 +96,13 @@ export function describeBackup(raw: string): string {
   count('readingapp.learning.v1', '已学记录');
   count('readingapp.progress.v1', '阅读进度');
   count('readingapp.checkins.v1', '打卡记录');
-  return `包含 ${parts.length > 0 ? parts.join(' · ') : '基础设置'} · 约 ${sizeKb} KB`;
+  // 归属信息要一起报出来:导入前用户最该知道的就是"这份数据是谁的"
+  const owner = payload.ownerEmail
+    ? `归属 ${payload.ownerEmail}`
+    : payload.ownerId
+      ? '归属另一个账号'
+      : '归属:未绑定账号';
+  return `包含 ${parts.length > 0 ? parts.join(' · ') : '基础设置'} · 约 ${sizeKb} KB · ${owner}`;
 }
 
 /** 解析并校验备份内容 */
@@ -104,6 +123,8 @@ export function parseBackup(raw: string): BackupPayload | null {
       app: 'article-reading',
       version: typeof parsed.version === 'number' ? parsed.version : BACKUP_VERSION,
       exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt : '',
+      ownerId: typeof parsed.ownerId === 'string' ? parsed.ownerId : null,
+      ownerEmail: typeof parsed.ownerEmail === 'string' ? parsed.ownerEmail : '',
       data,
     };
   } catch {
@@ -115,10 +136,31 @@ export function parseBackup(raw: string): BackupPayload | null {
  * 用备份覆盖本机数据。
  * @returns 写入了多少个键(0 表示备份里没有可识别的数据)
  */
-export async function importBackup(raw: string): Promise<number> {
+export async function importBackup(
+  raw: string,
+  options: { adoptOwner?: boolean } = {},
+): Promise<number> {
   const payload = parseBackup(raw);
   if (!payload) throw new Error('备份内容无法识别(请确认是从本 App 导出的)');
+
+  /**
+   * 归属校验:备份带来源账号、且与本机数据归属不同时,**默认拒绝导入**。
+   * 这挡住了"同一份备份发给多人导入 → 凭空复制出多份相同数据"的情况;
+   * 确实需要强制导入时,由调用方带 adoptOwner 明确表示。
+   */
+  const local = getLocalOwnerSync();
+  if (payload.ownerId && local && payload.ownerId !== local.accountId && !options.adoptOwner) {
+    throw new Error(
+      `这份备份属于 ${payload.ownerEmail || '另一个账号'},与本机数据的归属不一致,已拒绝导入。` +
+        '确实要强制导入时,请先在账号页解除本机归属(或确认改用该备份)。',
+    );
+  }
+
   const entries = Object.entries(payload.data);
   await AsyncStorage.multiSet(entries);
+  // 强制导入后,本机数据的归属改为备份的来源账号(内容已经变成它的了)
+  if (options.adoptOwner && payload.ownerId) {
+    await bindLocalOwner({ accountId: payload.ownerId, email: payload.ownerEmail ?? '' });
+  }
   return entries.length;
 }
