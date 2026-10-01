@@ -275,12 +275,20 @@ export default function TodayScreen() {
                 </ThemedText>
               </View>
               <View style={styles.statRow}>
-                <View style={styles.stat}>
+                {/*
+                  「今日新学词」可点:点进去就是生词本的「今日新增」筛选(B3)。
+                  以前这个数字只是个数 —— 第二天清零,谁也看不到昨天学了什么。
+                */}
+                <Pressable
+                  onPress={() =>
+                    router.push({ pathname: '/(tabs)/words', params: { filter: 'today' } })
+                  }
+                  style={({ pressed }) => [styles.stat, pressed && styles.pressed]}>
                   <ThemedText type="numeric">{learnedTodayCount}</ThemedText>
                   <ThemedText type="caption" themeColor="textSecondary">
-                    今日新学词
+                    今日新学词 ›
                   </ThemedText>
-                </View>
+                </Pressable>
                 <View style={styles.stat}>
                   <ThemedText type="numeric">{dueCount}</ThemedText>
                   <ThemedText type="caption" themeColor="textSecondary">
