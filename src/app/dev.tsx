@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SettingRow } from '@/components/setting-row';
 import { StatusNote } from '@/components/status-note';
+import { UpdatePrompt } from '@/components/update-dialog';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { isBackendConfigured } from '@/config/backend';
@@ -41,6 +42,8 @@ export default function DevScreen() {
 
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [busy, setBusy] = useState(false);
+  /** 更新弹窗预览(开发者选项) */
+  const [previewUpdate, setPreviewUpdate] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
   const loadSnapshot = useCallback(async () => {
@@ -227,6 +230,23 @@ export default function DevScreen() {
           />
         </ThemedView>
 
+        {/*
+          更新弹窗预览:本地构建的版本号通常比 GitHub 上的 release 新,
+          真实检查永远不会弹(会提示"已是最新"),所以留一个预览入口。
+        */}
+        <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
+          更新弹窗
+        </ThemedText>
+        <ThemedView type="backgroundElement" style={styles.list}>
+          <SettingRow
+            label="预览「发现新版本」弹窗"
+            sublabel="用假版本号 9.9.9 渲染,不影响真实检查逻辑"
+            value="预览 ›"
+            onPress={() => setPreviewUpdate(true)}
+            last
+          />
+        </ThemedView>
+
         <ThemedView type="backgroundElement" style={styles.card}>
           <ThemedText type="small" themeColor="textSecondary" style={styles.cardText}>
             想模拟「全新用户」:先「退出登录」,再「清空全部本机数据」——
@@ -237,6 +257,25 @@ export default function DevScreen() {
           </ThemedText>
         </ThemedView>
       </ScrollView>
+
+      {previewUpdate ? (
+        <UpdatePrompt
+          release={{
+            version: '9.9.9',
+            title: '预览用的假版本',
+            notes: [
+              '文章库分区标题不再压住卡片,吸顶时有不透明底',
+              '排序改成按钮 + 弹层,带每项说明',
+              '这个是开发者选项里的预览,不会真的下载任何东西',
+            ],
+            pageUrl: 'https://github.com/Justin-Emils/Eng/releases',
+            downloadUrl: 'https://github.com/Justin-Emils/Eng/releases',
+            publishedAt: new Date().toISOString(),
+          }}
+          current={String(Constants.expoConfig?.version ?? '1.0.0')}
+          onClose={() => setPreviewUpdate(false)}
+        />
+      ) : null}
     </ThemedView>
   );
 }

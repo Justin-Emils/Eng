@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar';
@@ -11,11 +11,13 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Radii, Spacing } from '@/constants/theme';
 import { getAllArticles, getArticleById } from '@/data/articles';
 import { computeStats, type LearningStats } from '@/domain/analytics';
+import { APP_VERSION } from '@/domain/app-version';
 import { bandLabelOf, DEFAULT_USER_VOCAB } from '@/domain/levels';
 import { curveForLevel } from '@/domain/knowledge';
 import { getReviewStatsSync } from '@/storage/review-stats';
 import { buildLearnerProfile, bandRoi, type LearnerProfile } from '@/domain/profile';
 import { computeStreak } from '@/domain/stats';
+import { checkForUpdate } from '@/domain/update';
 import { useAuth } from '@/hooks/use-auth';
 import { useTheme, useThemeMeta } from '@/hooks/use-theme';
 import {
@@ -62,6 +64,41 @@ export default function ProfileScreen() {
   const [topTopics, setTopTopics] = useState<{ tag: string; count: number }[]>([]);
   /** 量化画像(由 domain/profile 从 UserLevel 算出) */
   const [profile, setProfile] = useState<LearnerProfile | null>(null);
+  /** 「检查更新」进行中(防止连点) */
+  const [checkBusy, setCheckBusy] = useState(false);
+
+  /** 手动检查更新:force 绕过 6 小时节流,结果用对话框说出来(自动检查才是静默的) */
+  const handleCheckUpdate = async () => {
+    if (checkBusy) return;
+    setCheckBusy(true);
+    try {
+      const result = await checkForUpdate({ force: true });
+      if (result.status === 'available' && result.latest) {
+        const latest = result.latest;
+        Alert.alert(
+          `发现新版本 v${latest.version}`,
+          latest.notes.length > 0
+            ? latest.notes.slice(0, 6).join('\n')
+            : `当前 v${result.current},可以更新了。`,
+          [
+            { text: '稍后', style: 'cancel' },
+            {
+              text: '去下载',
+              onPress: () => {
+                void Linking.openURL(latest.downloadUrl).catch(() => {
+                  void Linking.openURL(latest.pageUrl).catch(() => {});
+                });
+              },
+            },
+          ],
+        );
+      } else {
+        Alert.alert('检查更新', result.message);
+      }
+    } finally {
+      setCheckBusy(false);
+    }
+  };
 
   const refresh = useCallback(() => {
     let active = true;
@@ -245,6 +282,22 @@ export default function ProfileScreen() {
             sublabel="主题与深浅模式、每日目标、语料更新、导出与清空"
             value={themeMeta.name}
             onPress={() => router.push('/settings')}
+          />
+          {/*
+            关于:更新日志(内嵌数据,断网可看)与检查更新(查 GitHub Release)。
+            手动检查走 force,绕过 6 小时节流。
+          */}
+          <SettingRow
+            label="更新日志"
+            sublabel="查看每个版本改了什么"
+            value={`v${APP_VERSION} ›`}
+            onPress={() => router.push('/changelog')}
+          />
+          <SettingRow
+            label="检查更新"
+            sublabel="向 GitHub Release 查询最新安装包"
+            value={checkBusy ? '检查中…' : '检查 ›'}
+            onPress={() => void handleCheckUpdate()}
             last
           />
         </ThemedView>

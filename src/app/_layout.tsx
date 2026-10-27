@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { UpdateDialog } from '@/components/update-dialog';
 import { APP_FONTS } from '@/constants/fonts';
 import { hydrateRemoteArticles } from '@/data/articles/remote-registry';
 import { getAuthState, hydrateAuth } from '@/domain/auth/store';
@@ -152,6 +153,8 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
       </Stack>
+      {/* 启动后自动检查更新(6 小时节流;没有新版本时它什么都不渲染) */}
+      <UpdateDialog />
       {/* 两个条件都满足才淡出:启动数据就绪 + 内嵌字体已加载 */}
       <AnimatedSplashOverlay ready={bootChecked && fontsLoaded} />
     </ThemeProvider>
