@@ -21,6 +21,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.14',
+    date: '2026-10-27',
+    title: '检查更新的可用性改进',
+    notes: [
+      '查询被 GitHub 限流时给出人话提示(每小时 60 次,按网络共享),不再只显示 403',
+      '「检查更新」一分钟内重复点击会直接提示刚查过,避免把配额刷光',
+      '更新弹窗新增「复制链接」:github.com 打不开时可以把直链粘到别的工具里下载',
+      '打开链接失败时自动复制地址并说明原因,不再静默失败',
+    ],
+  },
+  {
     version: '1.1.13',
     date: '2026-10-27',
     title: '邮箱真实性校验',

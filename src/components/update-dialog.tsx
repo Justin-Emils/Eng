@@ -16,8 +16,9 @@
  * 本地构建的版本号经常比线上 release 新,不拆出来的话这个弹窗根本没法在真机上看到。
  */
 
+import * as Clipboard from 'expo-clipboard';
 import { useCallback, useEffect, useState } from 'react';
-import { Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Linking, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -47,13 +48,23 @@ export function UpdatePrompt({
     try {
       await Linking.openURL(release.downloadUrl);
     } catch {
-      // 打不开直链时退回发布页(至少让用户知道去哪)
-      await Linking.openURL(release.pageUrl).catch(() => {});
+      // 打不开:把链接复制到剪贴板,用户自己粘到浏览器(国内网络下 github.com 常常打不开)
+      await Clipboard.setStringAsync(release.downloadUrl).catch(() => {});
+      Alert.alert(
+        '打不开下载链接',
+        `地址已复制到剪贴板:\n${release.downloadUrl}\n\n如果浏览器也打不开 github.com,请先连上代理再粘贴访问。`,
+      );
     } finally {
       setBusy(false);
       onClose();
     }
-  }, [onClose, release.downloadUrl, release.pageUrl]);
+  }, [onClose, release.downloadUrl]);
+
+  /** 只复制链接,不尝试打开 */
+  const copyLink = useCallback(async () => {
+    await Clipboard.setStringAsync(release.downloadUrl).catch(() => {});
+    Alert.alert('下载地址已复制', release.downloadUrl);
+  }, [release.downloadUrl]);
 
   const handleDownload = useCallback(() => {
     if (dontRemind) onSkipVersion?.(release.version);
@@ -117,6 +128,13 @@ export function UpdatePrompt({
           </Pressable>
 
           <View style={styles.actions}>
+            <Pressable onPress={() => void copyLink()} style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type="backgroundSelected" radius="chip" style={styles.btnGhost}>
+                <ThemedText type="small" themeColor="textSecondary">
+                  复制链接
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
             <Pressable onPress={onClose} style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundSelected" radius="chip" style={styles.btnGhost}>
                 <ThemedText type="smallBold" themeColor="textSecondary">

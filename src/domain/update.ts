@@ -20,6 +20,8 @@ import { now } from '@/domain/clock';
 const STATE_KEY = 'readingapp.update.v1';
 /** 自动检查的最小间隔(6 小时) */
 export const AUTO_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+/** 手动检查的最小间隔(60 秒):保护 GitHub 匿名配额(每小时 60 次,按 IP 共享) */
+export const MANUAL_MIN_INTERVAL_MS = 60 * 1000;
 const REPO = 'Justin-Emils/Eng';
 
 interface UpdateState {
@@ -135,7 +137,20 @@ async function fetchLatest(): Promise<LatestRelease | null> {
   const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=10`, {
     headers: { Accept: 'application/vnd.github+json' },
   });
-  if (!res.ok) throw new Error(`GitHub 返回 ${res.status}`);
+  if (!res.ok) {
+    /**
+     * 把状态码翻译成人话。实测教训:匿名访问 api.github.com 每小时只有 60 次
+     * (按 IP 共享,同一网络下所有设备共用),超了返回 403 —— 以前这里直接抛
+     * "GitHub 返回 403",用户完全不知道该怎么办。
+     */
+    if (res.status === 403 || res.status === 429) {
+      throw new Error('查询太频繁了(GitHub 限制每小时 60 次),请过一小时再试');
+    }
+    if (res.status === 404) {
+      throw new Error('仓库不存在或还没有发布过版本');
+    }
+    throw new Error(`查询失败(GitHub 返回 ${res.status})`);
+  }
   const list = (await res.json()) as RawRelease[];
   const candidates = (Array.isArray(list) ? list : [])
     .filter((r) => !r.draft && !r.prerelease && typeof r.tag_name === 'string')
@@ -169,6 +184,10 @@ export async function checkForUpdate(options: { force?: boolean } = {}): Promise
 
   if (!options.force && state.lastCheckedAt > 0 && now() - state.lastCheckedAt < AUTO_CHECK_INTERVAL_MS) {
     return { status: 'throttled', current, message: '刚检查过,稍后再试' };
+  }
+  // 手动检查也节流:保护共享配额,并且能立刻告诉用户"其实刚查过"
+  if (options.force && state.lastCheckedAt > 0 && now() - state.lastCheckedAt < MANUAL_MIN_INTERVAL_MS) {
+    return { status: 'throttled', current, message: '刚检查过,约一分钟后再试' };
   }
 
   try {
