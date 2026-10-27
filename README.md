@@ -55,6 +55,42 @@ cd android
 > Windows 上请把 `JAVA_HOME` 指向 JDK 17/21(JDK 24 与 Android Gradle 插件不兼容)。
 > Release 默认用 debug 签名,自用安装可直接侧载;上架需换正式 keystore。
 
+## 打包 iOS(独立安装版)
+
+iPhone **装不了 APK**,只认有 Apple 签名的 `.ipa`。而且 `npx expo prebuild --platform ios`
+在非 macOS 上会被 Expo CLI 直接跳过(`⚠️ Skipping generating the iOS native project files`),
+所以 Windows 上没有"本地生成 `ios/` 再编译"这条路,只有下面两条。
+
+### 1. Expo Go(免费,自用/回归推荐)
+
+```bash
+npx expo start          # iPhone 打开「相机」扫终端里的二维码
+```
+
+代码跑在 App Store 版的 Expo Go 里:不产出安装包、不需要 Apple 账号。
+用到的原生模块(expo-sqlite / expo-image-picker / expo-symbols / NativeTabs 等)Expo Go 都已内置。
+
+### 2. EAS Build 云构建出 `.ipa`(需要 Apple Developer Program,$99/年)
+
+```bash
+npm i -g eas-cli
+eas login
+eas init                                    # 首次:创建/关联 EAS 项目
+eas device:create                           # 内测:先把 iPhone 的 UDID 注册进来
+eas build  --platform ios --profile preview # 内测包(ad-hoc,可直装到已注册设备)
+eas build  --platform ios --profile production
+eas submit --platform ios --profile production
+```
+
+> EAS 在 macOS 机器上跑 prebuild + Xcode,所以 Windows 也能出 iOS 包。
+> 免费 Apple ID **不能**用于 EAS 云构建的 iOS 分发(ad-hoc / TestFlight 都要求付费账号)。
+> 有 Mac 的话可以本地 `npx expo run:ios`(免费 Apple ID 可侧载,7 天有效期),开发回路最快。
+
+iOS 相关配置都在 `app.json` 的 `ios` 段:`bundleIdentifier`(上架后不可更改)、`buildNumber`、
+`supportsTablet`、`infoPlist.CFBundleDisplayName`(仅 iOS 的桌面显示名,不影响 Android)。
+图标走根级 `icon`(`assets/images/icon.png`);`assets/expo.icon` 是 Expo 模板自带的
+Icon Composer 素材,已不再被引用——要做 iOS 26 液态玻璃图标时再替换它并挂回 `ios.icon`。
+
 ## 首次启动流程
 
 ```
@@ -80,10 +116,11 @@ cd android
   - 修 bug / 打磨 UI → PATCH(`v1.0.13`)
   - 新增功能(如云同步、账号体系) → MINOR(`v1.1.0`)
   - 数据结构不兼容(备份格式、存储键重构) → MAJOR(`v2.0.0`)
-- **发版时必须同步改三处**,否则「关于」里显示的是假版本(曾经 tag 发到 v1.0.12、App 里还写着 1.0.0):
+- **发版时必须同步改四处**,否则「关于」里显示的是假版本(曾经 tag 发到 v1.0.12、App 里还写着 1.0.0):
   1. `app.json` 的 `version`
   2. `app.json` 的 `android.versionCode`(每次发版 +1,否则新 APK 装不上旧版之上)
-  3. 重新 `npx expo prebuild --platform android` 让 `android/` 里的 versionName / versionCode 跟着更新
+  3. `app.json` 的 `ios.buildNumber`(每次上传 App Store Connect 必须比上一次大,否则会被拒收)
+  4. 重新 `npx expo prebuild --platform android` 让 `android/` 里的 versionName / versionCode 跟着更新
 - Release 说明只写"这一版相比上一版新增/修了什么",不累积历史。
 
 > GitHub 上只保留两个版本:`v1.0.0`(起点)与最新一个;中间过程版本不长期留存。

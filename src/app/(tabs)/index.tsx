@@ -416,8 +416,8 @@ export default function TodayScreen() {
                 onPress={() => router.push('/(tabs)/review')}
               />
               <QuickTile
-                value={`${wordCount} / ${masteredCount}`}
-                label="生词本 未掌握/已掌握"
+                value={String(wordCount)}
+                label={masteredCount > 0 ? `生词本 · 已掌握 ${masteredCount}` : '生词本'}
                 onPress={() => router.push('/(tabs)/words')}
               />
               <QuickTile
@@ -447,8 +447,15 @@ function QuickTile({
       onPress={onPress}
       style={({ pressed }) => [styles.quickTileWrap, pressed && styles.pressed]}>
       <ThemedView type="backgroundElement" style={styles.quickTile}>
-        <ThemedText type="heading">{value}</ThemedText>
-        <ThemedText type="caption" themeColor="textSecondary">
+        {/*
+          数值与说明都限制为一行:以前生词本那格写的是「12 / 8」,文本宽度会把
+          这一格撑得比左右两格宽,三个盒子就不一样大了。现在数值只放一个数
+          (未掌握),已掌握的数挪到说明行里。
+        */}
+        <ThemedText type="heading" numberOfLines={1}>
+          {value}
+        </ThemedText>
+        <ThemedText type="caption" themeColor="textSecondary" numberOfLines={1}>
           {label}
         </ThemedText>
       </ThemedView>
@@ -510,9 +517,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.one,
   },
   quickRow: { flexDirection: 'row', gap: Spacing.two + 2, marginTop: Spacing.one },
-  quickTileWrap: { flex: 1 },
+  /** minWidth:0 是关键:flex:1 的子项默认按内容撑宽,长文本会让三格不等宽 */
+  quickTileWrap: { flex: 1, minWidth: 0 },
   quickTile: {
     paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.one,
     alignItems: 'center',
     gap: 2,
   },

@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Pressable, SectionList, StyleSheet, TextInput, View } from 'react-native';
+import { Modal, Pressable, SectionList, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ArticleCard } from '@/components/article-card';
@@ -20,21 +20,28 @@ import type { Article } from '@/types';
 
 type ViewMode = 'flat' | 'topic' | 'level';
 
-const MODES: { key: ViewMode; label: string }[] = [
-  { key: 'flat', label: '全部' },
-  { key: 'topic', label: '按话题' },
-  { key: 'level', label: '按难度' },
+const MODES: { key: ViewMode; label: string; hint: string }[] = [
+  { key: 'flat', label: '全部文章', hint: '不分组,按入库顺序' },
+  { key: 'topic', label: '按话题', hint: '经济 / 科技 / 文化…' },
+  { key: 'level', label: '按难度', hint: '按词汇量档位从易到难' },
 ];
 
 /**
  * 文章库:全部内置 + 每日公版更新文章。
  * 支持搜索 + 分组浏览(话题/难度),内容多也易定位。
+ *
+ * 两处界面重做(反馈):
+ *  1. **分区标题原来会叠在卡片上**:吸顶标题给了 sticky,但没有背景色 ——
+ *     卡片从标题文字下面透出来。现在标题是满宽、不透明背景,并加了一条强调色竖条;
+ *  2. **排序原来是横排三个 chip**,挤且看不出"这是选项"。改成右侧一个按钮,
+ *     点开是底部弹层,每项带说明与勾选。
  */
 export default function LibraryScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const skin = useThemeSkin();
   const [mode, setMode] = useState<ViewMode>('topic');
+  const [sortOpen, setSortOpen] = useState(false);
   const [query, setQuery] = useState('');
   const completedIds = useCompletedArticleIds();
   // 聚焦时重新读取语料(远程每日更新文章水化后立即可见)
@@ -94,6 +101,8 @@ export default function LibraryScreen() {
     return keys.map((k) => ({ key: k, title: k, data: map.get(k)! }));
   }, [filtered, mode]);
 
+  const currentMode = MODES.find((m) => m.key === mode) ?? MODES[0];
+
   return (
     <ThemedView style={styles.flex}>
       {/* 标题 */}
@@ -106,12 +115,12 @@ export default function LibraryScreen() {
         </ThemedText>
       </View>
 
-      {/* 搜索 */}
-      <View style={styles.searchWrap}>
+      {/* 搜索 + 排序按钮(同一行:搜索占满,排序靠右) */}
+      <View style={styles.toolbar}>
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="搜索文章标题或摘要"
+          placeholder="搜索标题或摘要"
           placeholderTextColor={theme.textSecondary}
           style={[
             styles.searchInput,
@@ -125,25 +134,21 @@ export default function LibraryScreen() {
           returnKeyType="search"
           clearButtonMode="while-editing"
         />
-      </View>
-
-      {/* 视图切换 */}
-      <View style={styles.modeWrap}>
-        {MODES.map((m) => {
-          const active = m.key === mode;
-          return (
-            <Pressable key={m.key} onPress={() => setMode(m.key)} style={styles.modeBtn}>
-              <ThemedView
-                type={active ? 'backgroundSelected' : 'backgroundElement'}
-                radius="chip"
-                style={[styles.modeChip, active && { borderColor: theme.accent }]}>
-                <ThemedText type="smallBold" themeColor={active ? 'accent' : 'textSecondary'}>
-                  {m.label}
-                </ThemedText>
-              </ThemedView>
-            </Pressable>
-          );
-        })}
+        <Pressable
+          onPress={() => setSortOpen(true)}
+          style={({ pressed }) => pressed && styles.pressed}>
+          <ThemedView
+            type="backgroundElement"
+            radius="chip"
+            style={[styles.sortBtn, { borderColor: theme.border }]}>
+            <ThemedText type="smallBold" numberOfLines={1}>
+              {currentMode.label}
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              ▾
+            </ThemedText>
+          </ThemedView>
+        </Pressable>
       </View>
 
       <SectionList
@@ -156,13 +161,19 @@ export default function LibraryScreen() {
         ListHeaderComponentStyle={styles.stripWrap}
         renderSectionHeader={({ section }) =>
           section.title ? (
-            <View style={styles.sectionHeader}>
-              <ThemedText type="smallBold" themeColor="accent">
-                {section.title}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary">
-                {section.data.length} 篇
-              </ThemedText>
+            /**
+             * 吸顶标题必须**不透明**:以前只有 padding 没有背景,
+             * 吸顶时下面的卡片会从文字中间透出来(反馈里的"重叠")。
+             * 现在是满宽不透明底 + 左侧强调色竖条,和卡片内容明确分层。
+             */
+            <View style={[styles.sectionHeader, { backgroundColor: theme.background }]}>
+              <View style={styles.sectionHeaderInner}>
+                <View style={[styles.sectionAccent, { backgroundColor: theme.accent }]} />
+                <ThemedText type="smallBold">{section.title}</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.sectionCount}>
+                  {section.data.length} 篇
+                </ThemedText>
+              </View>
             </View>
           ) : null
         }
@@ -191,7 +202,84 @@ export default function LibraryScreen() {
           )
         }
       />
+
+      <SortSheet
+        visible={sortOpen}
+        value={mode}
+        onChange={(next) => {
+          setMode(next);
+          setSortOpen(false);
+        }}
+        onClose={() => setSortOpen(false)}
+      />
     </ThemedView>
+  );
+}
+
+/**
+ * 排序方式:底部弹层。
+ * 原来把三个选项横排成 chip,看起来像筛选项、也不写各自含义;
+ * 现在是一个按钮 + 带说明的菜单,点了才知道"按话题/按难度"到底怎么排。
+ */
+function SortSheet({
+  visible,
+  value,
+  onChange,
+  onClose,
+}: {
+  visible: boolean;
+  value: ViewMode;
+  onChange: (next: ViewMode) => void;
+  onClose: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const theme = useTheme();
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.sheetRoot}>
+        <Pressable style={styles.sheetBackdrop} onPress={onClose} />
+        <ThemedView
+          type="backgroundElement"
+          style={[styles.sheetCard, { paddingBottom: insets.bottom + Spacing.three }]}>
+          <View style={styles.sheetHandle} />
+          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sheetTitle}>
+            排序方式
+          </ThemedText>
+          {MODES.map((m) => {
+            const active = m.key === value;
+            return (
+              <Pressable
+                key={m.key}
+                onPress={() => onChange(m.key)}
+                style={({ pressed }) => pressed && styles.pressed}>
+                <View
+                  style={[
+                    styles.sheetRow,
+                    active && { backgroundColor: theme.backgroundSelected },
+                  ]}>
+                  <View style={styles.sheetRowText}>
+                    <ThemedText
+                      type={active ? 'smallBold' : 'small'}
+                      themeColor={active ? 'accent' : 'text'}>
+                      {m.label}
+                    </ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {m.hint}
+                    </ThemedText>
+                  </View>
+                  {active ? (
+                    <ThemedText type="smallBold" themeColor="accent">
+                      ✓
+                    </ThemedText>
+                  ) : null}
+                </View>
+              </Pressable>
+            );
+          })}
+        </ThemedView>
+      </View>
+    </Modal>
   );
 }
 
@@ -206,31 +294,30 @@ const styles = StyleSheet.create({
     fontSize: 28,
     lineHeight: 36,
   },
-  searchWrap: {
-    paddingHorizontal: Spacing.four,
-    paddingBottom: Spacing.two,
-  },
-  searchInput: {
-    minHeight: 44,
-    borderWidth: 1,
-    borderRadius: Radii.card,
-    paddingHorizontal: Spacing.three,
-    fontSize: 16,
-  },
-  modeWrap: {
+  toolbar: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingBottom: Spacing.two,
   },
-  modeBtn: { flexShrink: 0 },
-  modeChip: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: Radii.sharp,
+  searchInput: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 44,
     borderWidth: 1,
-    borderColor: 'transparent',
+    paddingHorizontal: Spacing.three,
+    fontSize: 16,
   },
+  sortBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    paddingHorizontal: Spacing.three,
+    minHeight: 44,
+    borderWidth: 1,
+  },
+  pressed: { opacity: 0.7 },
   listContent: {
     alignSelf: 'center',
     width: '100%',
@@ -238,15 +325,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     gap: Spacing.three,
   },
+  /**
+   * 吸顶分区标题:满宽 + 不透明背景(负边距抵消列表内边距,让底色铺满整屏宽度)。
+   * 不这么做的话,吸顶时卡片会从标题文字下面透出来。
+   */
   sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    paddingTop: Spacing.three,
-    paddingBottom: Spacing.one,
     marginHorizontal: -Spacing.four,
     paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.two,
+  },
+  sectionHeaderInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.two,
+  },
+  sectionAccent: {
+    width: 3,
+    height: 14,
+    borderRadius: 2,
+  },
+  sectionCount: {
+    marginLeft: 'auto',
   },
   stripWrap: {
     paddingTop: Spacing.one,
@@ -255,5 +355,50 @@ const styles = StyleSheet.create({
   empty: {
     paddingVertical: Spacing.six,
     alignItems: 'center',
+  },
+  // ── 排序弹层 ──
+  sheetRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  sheetCard: {
+    paddingTop: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderTopLeftRadius: Radii.card,
+    borderTopRightRadius: Radii.card,
+    gap: Spacing.one,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128,128,128,0.35)',
+    marginBottom: Spacing.two,
+  },
+  sheetTitle: {
+    paddingHorizontal: Spacing.two,
+    paddingBottom: Spacing.one,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.two,
+    paddingVertical: Spacing.three,
+    borderRadius: Radii.sharp,
+  },
+  sheetRowText: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
   },
 });

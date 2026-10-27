@@ -2,17 +2,22 @@
   "expo": {
     "name": "article-reading",
     "slug": "article-reading",
-    "version": "1.1.10",
+    "version": "1.1.11",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "articlereading",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "com.articlereading.selfstudy",
+      "buildNumber": "1",
+      "supportsTablet": false,
+      "infoPlist": {
+        "CFBundleDisplayName": "考研英语阅读"
+      }
     },
     "android": {
       "package": "com.articlereading.selfstudy",
-      "versionCode": 12,
+      "versionCode": 13,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -37,7 +42,15 @@
         }
       ],
       "expo-sqlite",
-      "expo-system-ui"
+      "expo-system-ui",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "允许「考研英语阅读」访问你的照片，用于设置头像。",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
