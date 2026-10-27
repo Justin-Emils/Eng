@@ -21,6 +21,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.13',
+    date: '2026-10-27',
+    title: '邮箱真实性校验',
+    notes: [
+      '注册与找回密码前会检查邮箱域名有没有邮件服务器(MX 记录),假邮箱注册不了了',
+      '常见错拼(如 gmial.com、163.con)会在输入框下方直接提示正确写法',
+      '邮箱统一去空白 + 转小写,避免同一邮箱因大小写被当成两个号',
+      '离线或域名查询失败时不阻断,只在发现域名不存在时拦下',
+    ],
+  },
+  {
     version: '1.1.12',
     date: '2026-10-27',
     title: '更新日志与检查更新',

@@ -22,6 +22,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
 import { changePassword, requestPasswordReset, resetPasswordWithCode } from '@/domain/auth/store';
 import { validateCode, validateEmail, validatePassword, validatePasswordConfirm } from '@/domain/auth/validate';
+import { checkEmailDomain, normalizeEmail, suggestEmail } from '@/domain/email-check';
 import { useAuth } from '@/hooks/use-auth';
 
 export default function ForgotPasswordScreen() {
@@ -34,6 +35,9 @@ export default function ForgotPasswordScreen() {
   // 已登录时(改密码模式)直接用当前账号邮箱作初值 —— 用惰性初始化而不是 effect,
   // 避免"渲染 → effect 里 setState → 再渲染"的级联渲染
   const [email, setEmail] = useState(() => auth.session?.user.email ?? '');
+
+  /** 笔误建议(B1):格式合法但域名像是打错了(如 gmial.com),不阻断提交 */
+  const emailSuggestion = suggestEmail(email);
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -74,14 +78,27 @@ export default function ForgotPasswordScreen() {
   };
 
   const handleSendCode = async () => {
-    const emailError = validateEmail(email);
+    const normalizedEmail = normalizeEmail(email);
+    const emailError = validateEmail(normalizedEmail);
     setErrors(emailError ? { email: emailError } : {});
     setFailure(null);
     if (emailError) return;
 
     setBusy(true);
     try {
-      await requestPasswordReset(email);
+      /**
+       * B1:发验证码前确认域名能收信 —— 这里正是"假邮箱"最致命的地方:
+       * 验证码发到一个不存在的域名,用户会一直等一封永远不会来的邮件。
+       */
+      const mx = await checkEmailDomain(normalizedEmail);
+      if (mx.status === 'no-records') {
+        setErrors({ email: mx.detail });
+        return;
+      }
+      if (mx.status === 'a-only') {
+        setFailure(`${mx.detail},仍会尝试发送。请留意垃圾箱,或换一个邮箱重试。`);
+      }
+      await requestPasswordReset(normalizedEmail);
       setStep('verify');
       setSuccess(`验证码已发送到 ${email.trim()},请查看邮件(含垃圾箱),10 分钟内有效。`);
       startCooldown();
@@ -193,6 +210,7 @@ export default function ForgotPasswordScreen() {
           placeholder="you@example.com"
           keyboardType="email-address"
           autoComplete="email"
+        hint={emailSuggestion ? `你是不是想输入 ${emailSuggestion}?` : undefined}
           returnKeyType="done"
           error={errors.email}
           editable={!busy}

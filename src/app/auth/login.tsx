@@ -16,6 +16,7 @@ import { StatusNote } from '@/components/status-note';
 import { ThemedText } from '@/components/themed-text';
 import { isBackendConfigured } from '@/config/backend';
 import { signIn } from '@/domain/auth/store';
+import { suggestEmail } from '@/domain/email-check';
 import { validateEmail, validatePassword } from '@/domain/auth/validate';
 import { adoptLocalDataToCurrentAccount, autoSyncAfterLogin, planLoginSync, restoreFromCloud } from '@/domain/sync';
 import { markPulled } from '@/domain/autosync';
@@ -30,6 +31,9 @@ export default function LoginScreen() {
   const fromGate = params.from === 'welcome';
 
   const [email, setEmail] = useState('');
+  /** 笔误建议(B1):格式合法但域名像是打错了(如 gmial.com),不阻断提交 */
+  const emailSuggestion = suggestEmail(email);
+
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [failure, setFailure] = useState<string | null>(null);
@@ -204,6 +208,7 @@ export default function LoginScreen() {
         placeholder="you@example.com"
         keyboardType="email-address"
         autoComplete="email"
+        hint={emailSuggestion ? `你是不是想输入 ${emailSuggestion}?` : undefined}
         returnKeyType="next"
         error={errors.email}
         editable={!busy}

@@ -3,17 +3,20 @@
  * 这里只做"明显错误就地拦住",不追求复杂规则 —— 真正的强密码策略由后端把关。
  */
 
-/** 邮箱:够用的形状校验(不追求 RFC 完整实现) */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/;
+import { emailSyntaxError } from '@/domain/email-check';
 
 /** Supabase 默认要求密码至少 6 位;这里按同样下限校验,避免白跑一趟请求 */
 export const MIN_PASSWORD_LENGTH = 6;
 
+/**
+ * 邮箱格式校验。
+ *
+ * 实现在 `domain/email-check.ts`:那里除了格式,还有常见错拼的建议
+ * (如 `gmial.com` → `gmail.com`),建议会拼进错误信息里,三个页面都能看到。
+ * 域名能否收信(MX)是**异步**检查,由注册 / 找回密码页面另外做 —— 见 B1。
+ */
 export function validateEmail(value: string): string | null {
-  const v = value.trim();
-  if (!v) return '请输入邮箱';
-  if (!EMAIL_RE.test(v)) return '邮箱格式不正确';
-  return null;
+  return emailSyntaxError(value);
 }
 
 export function validatePassword(value: string): string | null {

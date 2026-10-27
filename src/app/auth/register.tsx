@@ -7,7 +7,7 @@
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Alert, Pressable, StyleSheet } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
 import { FormField } from '@/components/form-field';
@@ -16,6 +16,7 @@ import { StatusNote } from '@/components/status-note';
 import { ThemedText } from '@/components/themed-text';
 import { isBackendConfigured } from '@/config/backend';
 import { register } from '@/domain/auth/store';
+import { checkEmailDomain, normalizeEmail, suggestEmail } from '@/domain/email-check';
 import { validateEmail, validateNickname, validatePassword, validatePasswordConfirm } from '@/domain/auth/validate';
 import { pushProfile } from '@/domain/sync';
 import { getAccount, saveAccount } from '@/storage/account';
@@ -36,6 +37,9 @@ export default function RegisterScreen() {
 
   const [nickname, setNickname] = useState('');
   const [email, setEmail] = useState('');
+  /** 笔误建议(B1):格式合法但域名像是打错了(如 gmial.com),不阻断提交 */
+  const emailSuggestion = suggestEmail(email);
+
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -62,8 +66,10 @@ export default function RegisterScreen() {
 
   const handleSubmit = async () => {
     const next: FieldErrors = {};
+    // 统一规范化后再校验/提交:去空白 + 小写,避免 Gmail 与 gmail 被当成两个号
+    const normalizedEmail = normalizeEmail(email);
     const nicknameError = validateNickname(nickname);
-    const emailError = validateEmail(email);
+    const emailError = validateEmail(normalizedEmail);
     const passwordError = validatePassword(password);
     const confirmError = validatePasswordConfirm(password, confirm);
     if (nicknameError) next.nickname = nicknameError;
@@ -76,7 +82,34 @@ export default function RegisterScreen() {
 
     setBusy(true);
     try {
-      const session = await register(email, password, nickname);
+      /**
+       * B1:注册前确认邮箱域名真的能收信。
+       * 不查的话,随手编一个邮箱也能注册成功 —— 而「忘记密码」要靠邮箱收验证码,
+       * 功能就自相矛盾了。离线时(unknown)不阻断,只跳过这一步。
+       */
+      const mx = await checkEmailDomain(normalizedEmail);
+      if (mx.status === 'no-records') {
+        setErrors({ email: mx.detail });
+        setBusy(false);
+        return;
+      }
+      if (mx.status === 'a-only') {
+        const proceed = await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            '这个邮箱可能收不到验证码',
+            `${mx.detail}。\n\n注册后如果忘记密码,需要靠这个邮箱收验证码。`,
+            [
+              { text: '换个邮箱', style: 'cancel', onPress: () => resolve(false) },
+              { text: '继续注册', onPress: () => resolve(true) },
+            ],
+          );
+        });
+        if (!proceed) {
+          setBusy(false);
+          return;
+        }
+      }
+      const session = await register(normalizedEmail, password, nickname);
 
       // 昵称/头像同时写进本机与云端,换手机登回来时资料一致
       const trimmed = nickname.trim();
@@ -146,6 +179,7 @@ export default function RegisterScreen() {
         placeholder="you@example.com"
         keyboardType="email-address"
         autoComplete="email"
+        hint={emailSuggestion ? `你是不是想输入 ${emailSuggestion}?` : undefined}
         returnKeyType="next"
         error={errors.email}
         editable={!busy}
