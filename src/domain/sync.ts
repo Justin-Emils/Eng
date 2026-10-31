@@ -12,6 +12,7 @@ import { REST_BASE, SUPABASE_KEY } from '@/config/backend';
 import { AuthError } from '@/domain/auth/api';
 import { ensureAccessToken, getAuthState } from '@/domain/auth/store';
 import { backupFingerprint, exportBackup, importBackup } from '@/domain/backup';
+import { TimeoutError, fetchWithTimeout } from '@/domain/net';
 import { decideLoginSync } from '@/domain/login-sync';
 import { checkOwnership, type OwnershipCheck } from '@/domain/ownership';
 import { DEFAULT_AVATAR, getAccount, saveAccount } from '@/storage/account';
@@ -70,7 +71,9 @@ async function rest<T>(
 
   let response: Response;
   try {
-    response = await fetch(`${REST_BASE}${path}`, {
+    // **P1-10**:统一超时。以前这里裸 fetch,弱网下"登录中…"会永远转圈。
+    response = await fetchWithTimeout(`${REST_BASE}${path}`, {
+      timeoutMs: 10_000,
       method,
       headers: {
         apikey: SUPABASE_KEY,
@@ -81,7 +84,8 @@ async function rest<T>(
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-  } catch {
+  } catch (e) {
+    if (e instanceof TimeoutError) throw e;
     throw new Error('网络连接失败,请检查网络后重试');
   }
 
@@ -198,12 +202,30 @@ export async function pullBackup(): Promise<RemoteBackup | null> {
   };
 }
 
+/**
+ * 只取云端备份的更新时间（P1-12 冲突检测用，不下载整份 payload）。
+ * 返回 null 表示云端还没有备份。
+ */
+export async function getRemoteUpdatedAt(): Promise<string | null> {
+  const userId = currentUserId();
+  const rows = await rest<{ updated_at?: string }[]>(
+    `/backups?select=updated_at&user_id=eq.${userId}`,
+    { method: 'GET' },
+  );
+  return Array.isArray(rows) ? (rows[0]?.updated_at ?? null) : null;
+}
 /** 用云端备份覆盖本机(返回写入的键数量);覆盖后本机数据的归属改绑到该账号 */
 export async function restoreFromCloud(backup: RemoteBackup): Promise<number> {
   const userId = currentUserId();
   const count = await importBackup(backup.raw);
   // 本机内容现在等于这个账号的备份,归属随之改绑(这是**恢复**的语义,不是静默改绑)
   await bindLocalOwner({ accountId: userId, email: accountEmail() });
+  /**
+   * **P1-6**:恢复成功 = "以云端为准",必须同时建立同步基线。
+   * 以前这里不写 sync-state,于是新手机登录自动恢复之后,自动同步一直卡在
+   * "首次同步方向还没确定",直到用户手动点一次「立即同步」。
+   */
+  await saveSyncState({ lastHash: await backupFingerprint(), lastPulledAt: now() });
   return count;
 }
 

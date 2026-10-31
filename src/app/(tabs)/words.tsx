@@ -64,7 +64,7 @@ export default function WordsScreen() {
    */
   const refresh = useCallback(async () => {
     const [list, counts] = await Promise.all([getWords(), countByStatus()]);
-    const STAGE_RANK = { pending: 0, reviewing: 1, consolidated: 2 } as const;
+    const STAGE_RANK = { pending: 0, reviewing: 1, consolidated: 2, ignored: 3 } as const;
     setWords([...list].sort((a, b) => STAGE_RANK[stageOf(a)] - STAGE_RANK[stageOf(b)]));
     setDueCount(counts.due);
   }, []);

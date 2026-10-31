@@ -11,6 +11,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { businessFingerprint } from '@/domain/fingerprint';
+import { rehydrateAfterImport } from '@/domain/rehydrate';
 import { bindLocalOwner, getLocalOwnerSync } from '@/storage/local-owner';
 
 /** 需要备份的存储键(与各 storage 模块保持一致) */
@@ -168,10 +169,38 @@ export async function importBackup(
   }
 
   const entries = Object.entries(payload.data);
+
+  /**
+   * **P1-5 ① 先整体校验**:任何一项不是合法 JSON 就中止,不写半份。
+   * 以前直接把值写进 storage,粘贴一份被截断/改坏的备份会让 getWords() 解析失败返回
+   * 空数组,下一次写入就"真的清空"了生词本。
+   */
+  for (const [key, value] of entries) {
+    try {
+      JSON.parse(value);
+    } catch {
+      throw new Error(`备份里的「${key}」不是合法数据,已中止导入(本机数据没有改动)`);
+    }
+  }
+
+  const provided = new Set(entries.map(([k]) => k));
+  const missing = BACKUP_KEYS.filter((k) => !provided.has(k));
+
+  /**
+   * **P1-5 ② 覆盖语义**:先写新值,再删掉"备份里没有、本机却有"的键。
+   * 以前只 multiSet,于是备份产生时为空的那个 key(比如当时还没打卡)会保留本机旧值,
+   * 导入结果是"备份 + 旧残留"的混合体。顺序上先写后删,避免中途失败把数据全删光。
+   */
   await AsyncStorage.multiSet(entries);
+  if (missing.length > 0) await AsyncStorage.multiRemove(missing);
+
   // 强制导入后,本机数据的归属改为备份的来源账号(内容已经变成它的了)
   if (options.adoptOwner && payload.ownerId) {
     await bindLocalOwner({ accountId: payload.ownerId, email: payload.ownerEmail ?? '' });
   }
+
+  // **P1-5 ③ 热生效**:重建内存缓存,不用重启 App
+  await rehydrateAfterImport();
+
   return entries.length;
 }

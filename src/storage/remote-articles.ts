@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { countNewArticles, mergeRemoteArticles } from '@/domain/article-merge';
 import { todayKey } from '@/domain/clock';
 import type { Article } from '@/types';
 
@@ -35,10 +36,22 @@ export async function loadRemoteArticles(): Promise<StoreShape> {
   }
 }
 
-/** 保存一批远程文章并记录更新日期 */
-export async function saveRemoteArticles(articles: Article[]): Promise<void> {
-  const shape: StoreShape = { updatedDate: dateKey(), articles };
+/**
+ * 保存一批远程文章并记录更新日期。
+ *
+ * **P1-3**:以前这是**整份替换** —— 昨天读的文章今天被顶掉,于是
+ * 「累计读完」会缩水、生词本里的「来源:《…》」也会消失。
+ * 现在改为按 id 合并(见 domain/article-merge.ts),旧文章保留到上限为止。
+ *
+ * @returns 本次实际新增的篇数(0 表示内容没变)
+ */
+export async function saveRemoteArticles(articles: Article[]): Promise<number> {
+  const current = await loadRemoteArticles();
+  const merged = mergeRemoteArticles(current.articles, articles);
+  const newCount = countNewArticles(current.articles, articles);
+  const shape: StoreShape = { updatedDate: dateKey(), articles: merged };
   await AsyncStorage.setItem(KEY, JSON.stringify(shape));
+  return newCount;
 }
 
 /** 今天是否已更新过 */

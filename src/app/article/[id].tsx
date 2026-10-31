@@ -5,6 +5,8 @@ import {
   Pressable,
   StyleSheet,
   View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -34,6 +36,10 @@ import { getUserLevel } from '@/storage/user';
 const MIN_FONT = 16;
 const MAX_FONT = 28;
 const DEFAULT_FONT = 19;
+/** 打开本页后至少读这么久才可能算「读完」(P1-7:防"打开即完成") */
+const MIN_READ_MS = 8000;
+/** 滑到底后停留多久算读完(P1-7) */
+const BOTTOM_DWELL_MS = 3000;
 
 /**
  * 阅读页(模块 D + M1.2 进度续读 / 打卡):
@@ -60,6 +66,17 @@ export default function ArticleReaderScreen() {
   const [completed, setCompleted] = useState(false);
   /** 当前是否已滚到最后一段:把"自动完成"的机制显性化(footer 会据此给提示) */
   const [atEnd, setAtEnd] = useState(false);
+  /** 记录打开时刻(P1-7);写在 effect 里,避免 render 期间调用 Date.now() */
+  useEffect(() => {
+    openedAtRef.current = Date.now();
+  }, []);
+
+  /** 已进入视口(≥60%)的段落索引(P1-7) */
+  const visitedRef = useRef<Set<number>>(new Set());
+  /** 打开本页的时刻(P1-7);不能在 render 里调 Date.now(),先占位在 effect 里写入 */
+  const openedAtRef = useRef(0);
+  /** 滑到底停留计时(P1-7) */
+  const bottomTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 是否为"首次渲染后需要恢复滚动位置"(加载完进度前不滚)
   const [restoreIndex, setRestoreIndex] = useState<number | null>(null);
 
@@ -241,14 +258,42 @@ export default function ArticleReaderScreen() {
       lastSavedIndexRef.current = topVisible;
       void saveReadingProgress(article.id, { paragraphIndex: topVisible });
     }
-    // 读到末段:启动自动完成计时,并把"已到末段"暴露给界面
+
+    // 记录"看过的段落"(阈值 60%)
+    for (const i of visible) visitedRef.current.add(i);
+
     const reachedEnd = visible.includes(paragraphItems.length - 1);
     setAtEnd(reachedEnd);
+
     /**
-     * 读到末段**直接算读完**(用户决定:不做停留计时,滑到底就是 100%)。
-     * 原来要求"停留在底部 4 秒",既没人知道这条规则,也让人怀疑自己是不是没读进去。
+     * **P1-7**:以前"末段露出 40% 就算读完并打卡" —— 短文章打开即完成,
+     * 打卡与连续天数因此失去意义。现在两个条件同时满足才算读完:
+     *   ① 每一段都真正进入过视口(60%);② 打开本页已超过 MIN_READ_MS。
+     * 滑到底时另有一条"停留 3 秒"的通道(见 handleScroll),避免漏段时无法完成。
+     * 底部的「已完成阅读」按钮仍然是兜底。
      */
-    if (reachedEnd) void finishArticle();
+    const allParagraphsSeen = visitedRef.current.size >= paragraphItems.length;
+    const readLongEnough = openedAtRef.current > 0 && Date.now() - openedAtRef.current >= MIN_READ_MS;
+    if (allParagraphsSeen && readLongEnough) void finishArticle();
+  };
+
+  /** 滑到底 + 停留 3 秒也算读完(覆盖"跳读/段落未达 60%"的情况) */
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const nearBottom =
+      contentOffset.y + layoutMeasurement.height >= contentSize.height - 48;
+    if (!nearBottom) {
+      if (bottomTimerRef.current) {
+        clearTimeout(bottomTimerRef.current);
+        bottomTimerRef.current = null;
+      }
+      return;
+    }
+    if (bottomTimerRef.current) return;
+    bottomTimerRef.current = setTimeout(() => {
+      bottomTimerRef.current = null;
+      void finishArticle();
+    }, BOTTOM_DWELL_MS);
   };
 
   const listHeader = (
@@ -404,7 +449,9 @@ export default function ArticleReaderScreen() {
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
         onViewableItemsChanged={handleViewableChanged}
-        viewabilityConfig={{ itemVisiblePercentThreshold: 40 }}
+        onScroll={handleScroll}
+        scrollEventThrottle={160}
+        viewabilityConfig={{ itemVisiblePercentThreshold: 60 }}
         onScrollToIndexFailed={({ index, averageItemLength }) => {
           // 段落高度不定导致 scrollToIndex 失败时,按平均高度估算偏移量兜底
           listRef.current?.scrollToOffset({

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -54,6 +54,8 @@ export default function WordDetailScreen() {
 
 
   const mastered = wordItem?.status === 'mastered';
+  /** 掌握切换防连点锁(P1-8) */
+  const togglingRef = useRef(false);
 
   /**
    * 标为已掌握 / 取消已掌握。
@@ -64,11 +66,18 @@ export default function WordDetailScreen() {
    */
   const handleToggleMastered = async () => {
     if (!wordItem) return;
-    const nextMastered = !mastered;
-    await setWordStatus(wordItem.id, nextMastered ? 'mastered' : 'learning');
-    await recordReviewResult(wordItem.headword, true, !nextMastered);
-    const list = await getWords();
-    setWordItem(list.find((w) => w.id === wordItem.id) ?? null);
+    // **P1-8**:连点会在"已掌握/学习中"之间抖动,并重复 +1/-1 曲线样本 → 加同步锁
+    if (togglingRef.current) return;
+    togglingRef.current = true;
+    try {
+      const nextMastered = !mastered;
+      await setWordStatus(wordItem.id, nextMastered ? 'mastered' : 'learning');
+      await recordReviewResult(wordItem.headword, true, !nextMastered);
+      const list = await getWords();
+      setWordItem(list.find((w) => w.id === wordItem.id) ?? null);
+    } finally {
+      togglingRef.current = false;
+    }
   };
   /** 从生词本删除(不可恢复,二次确认) */
   const handleRemove = () => {

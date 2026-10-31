@@ -20,6 +20,7 @@ import {
 } from '@/domain/srs';
 import { getAllLearningWords, getDueWords, updateWordReview } from '@/storage/words';
 import { recordReviewResult } from '@/storage/review-stats';
+import { getSettings } from '@/storage/settings';
 import { now as clockNow } from '@/domain/clock';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import type { WordItem } from '@/types';
@@ -65,10 +66,14 @@ export default function ReviewScreen() {
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [queue, setQueue] = useState<WordItem[]>([]);
+  /** 超出「每日复习 N 词」目标、留到下一批的词(P1-9) */
+  const [overflow, setOverflow] = useState<WordItem[]>([]);
   const [cursor, setCursor] = useState(0);
   const [mode, setMode] = useState<CardMode>('question');
   /** 当前词的最终自评:决定详情页文案,以及是否显示「记错了」回退按钮 */
   const [lastGrade, setLastGrade] = useState<SelfGrade | null>(null);
+  /** 评分防连点锁(P1-8) */
+  const gradingRef = useRef(false);
   /** 本次自评产生的**实际结果**(等级、下次到期、是否转已巩固),详情页照着它说明 */
   const [lastOutcome, setLastOutcome] = useState<ReviewOutcome | null>(null);
   const [hintOn, setHintOn] = useState(false); // 例句提示是否显示
@@ -114,11 +119,36 @@ export default function ReviewScreen() {
     }
   };
 
-  const startReview = async (source: 'due' | 'all') => {
-    const list = source === 'due' ? await getDueWords() : await getAllLearningWords();
+  const startReview = async (source: 'due' | 'all' | 'rest') => {
+    /**
+     * **P1-9**:设置里的「每日复习 N 词」以前完全没人读 —— 设 10 也可能一次排 200。
+     * 现在按目标截断,剩下的放进 overflow,完成页给「继续复习剩余 N 词」。
+     */
+    if (source === 'rest') {
+      if (overflow.length === 0) return;
+      requeuedRef.current = new Set();
+      setQueue(overflow);
+      setOverflow([]);
+      setTally(EMPTY_TALLY);
+      setCursor(0);
+      setMode('question');
+      setLastGrade(null);
+      setLastOutcome(null);
+      setHintOn(false);
+      setPhase('running');
+      return;
+    }
+
+    const [list, settings] = await Promise.all([
+      source === 'due' ? getDueWords() : getAllLearningWords(),
+      getSettings(),
+    ]);
     if (list.length === 0) return;
+    const cap = settings.dailyGoal?.reviewWords ?? 0;
+    const session = cap > 0 ? list.slice(0, cap) : list;
+    setOverflow(cap > 0 ? list.slice(session.length) : []);
     requeuedRef.current = new Set();
-    setQueue(list);
+    setQueue(session);
     setTally(EMPTY_TALLY);
     setCursor(0);
     setMode('question');
@@ -149,6 +179,13 @@ export default function ReviewScreen() {
    */
   const gradeCurrent = async (grade: SelfGrade) => {
     if (!current || mode !== 'question') return;
+    /**
+     * **P1-8 连点保护**:mode 是 state,双击时第二次点击读到的还是 'question',
+     * 会用同一个旧 current 再写一次库、再记一笔曲线样本(reviewstats 被重复加权)。
+     * useRef 是同步的,能立刻拦住第二次点击。
+     */
+    if (gradingRef.current) return;
+    gradingRef.current = true;
     const next = scheduleReview(current, grade, clockNow());
     const outcome = readOutcome(current, grade, next);
     const updated: WordItem = { ...current, status: next.status, review: next.review };
@@ -169,6 +206,8 @@ export default function ReviewScreen() {
     setLastGrade(grade);
     setLastOutcome(outcome);
     setMode('answer');
+    // 解除连点锁(此时界面已切到答案态,后续点击由 mode 拦)
+    gradingRef.current = false;
   };
 
   /**
@@ -309,6 +348,22 @@ export default function ReviewScreen() {
               </ThemedText>
             </ThemedView>
           </Pressable>
+
+          {/*
+            P1-9:以前「每日复习 N 词」是个死设置 —— 复习页全量取词,设了 10 也可能被排 200。
+            现在会话按目标截断,剩下的词在这里提供入口继续。
+          */}
+          {overflow.length > 0 ? (
+            <Pressable
+              onPress={() => void startReview('rest')}
+              style={({ pressed }) => pressed && styles.pressed}>
+              <ThemedView type="backgroundElement" style={styles.bigBtn}>
+                <ThemedText type="smallBold" themeColor="textSecondary">
+                  继续复习剩余 {overflow.length} 词
+                </ThemedText>
+              </ThemedView>
+            </Pressable>
+          ) : null}
         </View>
       ) : current && mode === 'question' ? (
         /* 回忆卡:全屏布局,大按钮固定于中下部 */

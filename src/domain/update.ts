@@ -16,6 +16,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { APP_VERSION, compareVersions } from '@/domain/app-version';
 import { now } from '@/domain/clock';
+import { fetchWithTimeout } from '@/domain/net';
 
 const STATE_KEY = 'readingapp.update.v1';
 /** 自动检查的最小间隔(6 小时) */
@@ -134,7 +135,9 @@ function toNotes(body: string | undefined, title: string): string[] {
 }
 
 async function fetchLatest(): Promise<LatestRelease | null> {
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=10`, {
+  // **P1-10**:统一超时,避免"检查更新"在弱网下无限转圈
+  const res = await fetchWithTimeout(`https://api.github.com/repos/${REPO}/releases?per_page=10`, {
+    timeoutMs: 8_000,
     headers: { Accept: 'application/vnd.github+json' },
   });
   if (!res.ok) {

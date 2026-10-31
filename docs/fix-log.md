@@ -11,17 +11,17 @@
 | P0-2 | 云端读取失败被当成"云端为空",自动覆盖云端 | ✅ 完成 |
 | P0-3 | Release 用 debug 证书签名 | ✅ 完成 |
 | P1-1 | 打卡用本机时间 / 校准 URL 拼错 / UI 谎称联网 | ✅ 完成 |
-| P1-2 | "按词汇量标蓝"未实现 | ⏳ |
-| P1-3 | 每日远程文章整批替换致统计缩水 | ⏳ |
-| P1-4 | 清空生词本清不干净 | ⏳ |
-| P1-5 | 备份导入不是覆盖 + 需重启 | ⏳ |
-| P1-6 | 云端恢复后不建同步基线 | ⏳ |
-| P1-7 | 读完判定过松 | ⏳ |
-| P1-8 | 连点竞态(复习重复记账 / 评估重复答题) | ⏳ |
-| P1-9 | "每日复习 N 词"是死设置 | ⏳ |
-| P1-10 | 同步/更新请求无超时 | ⏳ |
-| P1-11 | 已巩固永久退出复习 | ⏳ |
-| P1-12 | 跨设备只上不下、整份覆盖 | ⏳ |
+| P1-2 | "按词汇量标蓝"未实现 | ✅ 完成 |
+| P1-3 | 每日远程文章整批替换致统计缩水 | ✅ 完成 |
+| P1-4 | 清空生词本清不干净 | ✅ 完成 |
+| P1-5 | 备份导入不是覆盖 + 需重启 | ✅ 完成 |
+| P1-6 | 云端恢复后不建同步基线 | ✅ 完成 |
+| P1-7 | 读完判定过松 | ✅ 完成 |
+| P1-8 | 连点竞态 | ✅ 完成 |
+| P1-9 | "每日复习 N 词"是死设置 | ✅ 完成 |
+| P1-10 | 同步/更新请求无超时 | ✅ 完成 |
+| P1-11 | 已巩固永久退出复习 | ✅ 完成 |
+| P1-12 | 跨设备只上不下 | ✅ 完成 |
 | P2 | 合规 / 安全 / 稳定性 / 商业成熟度 | ⏳ |
 | P3 | 文档漂移 / 死代码 / 代码卫生 | ⏳ |
 
@@ -105,4 +105,103 @@ node scripts/verify-login-sync.mjs     # P0-2
 node scripts/verify-email.mjs          # B1(之前批次)
 npx tsc --noEmit; npx eslint src
 apksigner verify --print-certs 考研英语阅读-v1.1.16.apk   # P0-3
+```
+
+---
+
+## P1-2 按词汇量标蓝(核心卖点)
+
+**根因**:`isStudyCandidate(word, userVocab)` 里 `void userVocab` —— 参数被丢弃,
+判定只取决于"是否在考研词表 + 词频名次 ≥ 4500"。1500 词与 9500 词的用户看到完全相同的蓝词。
+
+**改动**:新增 `domain/marking.ts` 的 `shouldMarkAsStudy()`:
+低于水平 300 词余量不标、认识概率 ≥0.85 不标、其余标;没有画像时退回旧口径。
+`wordlevel.isStudyCandidate` 改为调用它(可选传入 `pKnown`,页面可传曲线函数)。
+
+**证据**:`node scripts/verify-marking.mjs` → **17/17**。关键用例:
+`abandon`(门槛≈1201)@1500 词 → 标,@3000/@9500 → 不标;两个用户结论**不同**(修复前相同)。
+
+## P1-3 远程文章整批替换
+
+**根因**:`saveRemoteArticles` 整份替换 → 旧文章消失 → 「累计读完」缩水、生词来源丢失。
+
+**改动**:新增 `domain/article-merge.ts`(`mergeRemoteArticles` / `countNewArticles`),
+按 id 合并、新内容优先、旧文章保留到上限 200;`saveRemoteArticles` 改为合并写入并返回新增篇数。
+
+**证据**:`node scripts/verify-article-merge.mjs` → **12/12**(旧文章保留、去重、上限淘汰)。
+
+## P1-4 清空生词本清不干净
+
+**根因**:`clearWords()` 只删 `readingapp.words.v1`,而 `learning` / `known` / `reviewstats`
+仍保留"这个词已学/已会" → 清空后这些词永远不会再被标蓝。
+
+**改动**:`learning.clearLearning()`、`review-stats.clearReviewStats()`(同时清内存缓存)、
+`domain/reset.ts` 的 `clearAllLearningData()`;设置页改用它,确认框写明"删哪些、不影响哪些"。
+
+## P1-5 备份导入不是覆盖 + 需重启
+
+**根因**:只 `multiSet`,备份里没有的键会保留本机旧值;也不校验值是否合法 JSON;
+导入后内存缓存不更新,所以提示"请重启 App"。
+
+**改动**(`importBackup`):① 先整体校验每个值 `JSON.parse`,失败则中止且不改本机;
+② 先写新值、再 `multiRemove` 备份里没有的键(覆盖语义,且避免中途失败清空数据);
+③ 导入后调用 `domain/rehydrate.ts` 的 `rehydrateAfterImport()`(归属/同步基线/复习统计/时钟/主题)热生效。
+
+## P1-6 云端恢复后不建基线
+
+**根因**:`restoreFromCloud` 只 `importBackup` + `bindLocalOwner`,没写 sync-state → 自动同步一直卡在"首次同步方向未定"。
+
+**改动**:恢复成功后 `saveSyncState({ lastHash: await backupFingerprint(), lastPulledAt: now() })`;
+同时把 autosync 的提示文案改成账号页真实存在的按钮(「立即同步」/「从云端恢复」)。
+
+## P1-7 读完判定过松
+
+**根因**:末段露出 40% 即 `finishArticle()` —— 短文章打开即完成。
+
+**改动**:阈值提到 60%;完成条件改为"所有段落都进过视口 **且** 打开已超过 8 秒";
+另加"滑到底停留 3 秒"通道(`onScroll` 检测 near-bottom + 计时);
+底部手动按钮保留为兜底。
+
+## P1-8 连点竞态
+
+**改动**(四处同步锁):
+- `review.gradeCurrent`:useRef 锁,避免同一旧词重复写库 + 重复记曲线样本;
+- `assessment.answer`:250ms 锁,避免同一个词被记两次答案;
+- `word/[word].handleToggleMastered`:锁 + finally 释放,避免掌握状态抖动;
+- `dict-card.handleSave`:锁 + finally,避免快速连点 toggle 两次(等于没收藏)。
+
+## P1-9 「每日复习 N 词」死设置
+
+**改动**:`startReview` 读取 `settings.dailyGoal.reviewWords` 并截断本次会话,
+剩余放进 `overflow`;完成页出现「继续复习剩余 N 词」。
+
+## P1-10 请求无超时
+
+**改动**:新增 `domain/net.ts` 的 `fetchWithTimeout`(含 `TimeoutError`);
+`sync.rest()` 10 秒、`update.fetchLatest()` 8 秒。超时给出可行动文案。
+
+## P1-11 已巩固永久退出复习
+
+**改动**:`srs.isDue` 只把 `ignored`(用户主动"我会了")排除,`mastered` 按超长间隔回来;
+`INTERVAL_DAYS` 扩到 `[1,2,4,7,15,30,60,120,240]`;`stageOf` 新增 `'ignored'` 阶段,
+`WORD_STAGE_LABEL`/`WORD_STAGE_HINT` 区分「已巩固」与「已忽略」;
+生词本排序把已忽略排最后。
+
+## P1-12 跨设备只上不下
+
+**改动**:`sync.getRemoteUpdatedAt()`(只取 `updated_at`,不下载 payload);
+`maybeAutoSync` 上传前比对:云端时间比本机基线新 5 秒以上 → **不自动上传**,
+返回 blocked 并提示"云端有更新的数据,请选择从云端恢复或立即同步"。
+
+---
+
+## 验证汇总(全部可执行)
+
+```powershell
+node scripts/verify-fingerprint.mjs     # 7
+node scripts/verify-login-sync.mjs      # 8
+node scripts/verify-marking.mjs         # 17
+node scripts/verify-article-merge.mjs   # 12
+node scripts/verify-email.mjs           # 31
+npx tsc --noEmit ; npx eslint src       # 0 errors / 0 warnings
 ```

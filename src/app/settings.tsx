@@ -25,7 +25,8 @@ import { useResolvedScheme, useTheme, useThemeSkin } from '@/hooks/use-theme';
 import { setThemeId, setThemeMode, useThemeId, useThemeMode, type ThemeMode } from '@/hooks/use-theme-pref';
 import { getSettings, saveDailyGoal, type DailyGoal } from '@/storage/settings';
 import { getUserLevel } from '@/storage/user';
-import { clearWords, getWords } from '@/storage/words';
+import { clearAllLearningData } from '@/domain/reset';
+import { getWords } from '@/storage/words';
 
 const GOAL_PRESETS: DailyGoal[] = [
   { articles: 1, reviewWords: 5 },
@@ -143,13 +144,16 @@ export default function SettingsScreen() {
   };
 
   const handleClearWords = () => {
-    Alert.alert('清空生词本?', '会删除全部生词与复习进度,不可恢复。阅读记录不受影响。', [
+    Alert.alert(
+      '清空学习数据?',
+      '将删除:生词本、复习进度、已学/已会标记、复习校准统计。\n\n阅读记录与打卡不受影响,删除不可恢复。',
+      [
       { text: '取消', style: 'cancel' },
       {
         text: '清空',
         style: 'destructive',
         onPress: () => {
-          void clearWords();
+          void clearAllLearningData();
         },
       },
     ]);

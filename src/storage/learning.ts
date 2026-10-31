@@ -103,3 +103,11 @@ export async function getAllKnown(): Promise<Set<string>> {
   const known = await readKnown();
   return new Set(known);
 }
+
+/**
+ * 清空"已学 / 已会"记录(P1-4)。
+ * 只清生词本不清这些,会导致那些词永远不会再被标蓝 —— 见 domain/reset.ts。
+ */
+export async function clearLearning(): Promise<void> {
+  await AsyncStorage.multiRemove([LEARNING_KEY, KNOWN_KEY]);
+}

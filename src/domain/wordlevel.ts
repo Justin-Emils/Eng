@@ -12,6 +12,8 @@
 import { WORD_META } from '@/data/word-meta';
 import { CORE_DICT } from '@/data/dict-core';
 import { isExternalWord } from '@/domain/external';
+import { thresholdOfWord } from '@/domain/difficulty';
+import { shouldMarkAsStudy } from '@/domain/marking';
 import { normalizeWord, lookupCandidates } from '@/domain/wordmark';
 
 /** 内置核心词表(人工精选基础/虚词),覆盖这些词永不作为"待学词"标蓝 */
@@ -139,17 +141,24 @@ export function wordFreqThreshold(word: string): number | null {
  * 因为它们正是备考要积累的词;不再按 userVocab 逐词卡(否则难文章反而标不出词)。
  * userVocab 参数保留,供未来可选的"高级过滤"使用,当前不影响判定。
  */
-export function isStudyCandidate(word: string, userVocab?: number): boolean {
-  void userVocab;
+export function isStudyCandidate(
+  word: string,
+  userVocab?: number,
+  pKnown?: (threshold: number) => number,
+): boolean {
   const w = normalizeWord(word);
   if (!w || CORE_KEYS.has(w)) return false;
 
-  // 词频很靠前的基础词不标:frq 名次小于该值视为"四级以下已会高频词"
-  // (click/pause/raw 等虽在考研大纲表里,但属于早已掌握的高频词)
   const m = metaForWithStem(word);
   const rank = m?.frq ?? m?.bnc ?? null;
-  if (rank != null && rank > 0 && rank < 4500) return false;
+  const threshold = thresholdOfWord(word);
 
-  // 命中考研大纲词表(带词干还原)
-  return isExternalWord(word);
+  // 判定规则见 domain/marking.ts(纯函数,有 scripts/verify-marking.mjs 盯着)
+  return shouldMarkAsStudy({
+    threshold,
+    userVocab,
+    pKnown,
+    rank,
+    isExternal: isExternalWord(word),
+  });
 }

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -59,6 +59,8 @@ export default function AssessmentScreen() {
   const [finalRounds, setFinalRounds] = useState<BandResult[]>([]);
 
   // --- 自适应测试状态 ---
+  /** 答题防连点锁(P1-8):250ms 内忽略重复点击,避免同一个词被记两次答案 */
+  const answeringRef = useRef(false);
   const [currentBand, setCurrentBand] = useState<number>(START_BAND);
   const [roundAnswers, setRoundAnswers] = useState<Answer[]>([]); // 当前轮已答
   const [rounds, setRounds] = useState<BandResult[]>([]); // 已结束轮
@@ -105,6 +107,15 @@ export default function AssessmentScreen() {
 
   const answer = async (known: boolean) => {
     if (!currentWord) return;
+    /**
+     * **P1-8**:两次渲染之间同一个词会被记两遍答案,导致该轮正确率失真。
+     * 用同步锁挡住第二次点击。
+     */
+    if (answeringRef.current) return;
+    answeringRef.current = true;
+    setTimeout(() => {
+      answeringRef.current = false;
+    }, 250);
     const nextAnswers = [...roundAnswers, { word: currentWord, threshold: currentBand, known }];
     setRoundAnswers(nextAnswers);
     // 该轮答满或词耗尽 → 结算本轮

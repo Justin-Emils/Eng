@@ -101,3 +101,17 @@ export async function recordReviewResult(
 export function reviewStatsHydrated(): boolean {
   return hydrated;
 }
+
+/**
+ * 清空复习校准统计(P1-4):删词之后不该继续用已删数据的作答去影响知识曲线。
+ * 同时把内存缓存一并清掉,否则本次运行内曲线仍按旧数据算。
+ */
+export async function clearReviewStats(): Promise<void> {
+  cache = {};
+  hydrated = true;
+  try {
+    await AsyncStorage.removeItem(REVIEW_STATS_KEY);
+  } catch {
+    // 忽略
+  }
+}

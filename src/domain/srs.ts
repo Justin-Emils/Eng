@@ -25,7 +25,7 @@ export const AGAIN_REVIEW_DELAY_MS = 10 * 60 * 1000;
 export const MASTER_THRESHOLD = 5;
 
 /** 间隔天数序列(按 reps 推进):第 n 次记住后的下次间隔 */
-const INTERVAL_DAYS = [1, 2, 4, 7, 15, 30, 60];
+const INTERVAL_DAYS = [1, 2, 4, 7, 15, 30, 60, 120, 240];
 
 /** 反馈 → ease 增量 */
 const EASE_DELTA: Record<ReviewGrade, number> = {
@@ -98,7 +98,13 @@ export function scheduleReview(word: WordItem, grade: ReviewGrade, now = Date.no
  * mastered/ignored 默认不进入常规复习队列。
  */
 export function isDue(word: WordItem, now = Date.now()): boolean {
-  if (word.status === 'mastered' || word.status === 'ignored') return false;
+  /**
+   * **P1-11**:以前 `mastered` 和 `ignored` 一样永久退出复习。
+   * Anki/SuperMemo 的做法是"间隔继续拉长"而不是停 —— 5 次答对时最后一次间隔才 15 天,
+   * 几个月后大概率遗忘,而 App 不会提醒。现在已巩固的词按超长间隔(60/120/240 天)回来;
+   * 只有用户主动"我已会"(ignored)才彻底不出现。
+   */
+  if (word.status === 'ignored') return false;
   return word.review.dueAt <= now;
 }
 
@@ -127,12 +133,17 @@ export interface SessionSummary {
  * 加值意味着要迁移 storage 里的全部生词,还会牵连 isDue / 各种 filter;
  * 而这三个阶段的全部信息在 status + review.reps 里已经齐了,直接推导更安全。
  */
-export type WordStage = 'pending' | 'reviewing' | 'consolidated';
+export type WordStage = 'pending' | 'reviewing' | 'consolidated' | 'ignored';
 
 /** 判断一个词当前处于哪个阶段 */
 export function stageOf(word: WordItem): WordStage {
-  // ignored = 用户标记"我已会",与 mastered 一样退出学习队列
-  if (word.status === 'mastered' || word.status === 'ignored') return 'consolidated';
+  /**
+   * **P1-11**:以前 `ignored`(用户点"我会了")和 `mastered`(复习达成)都被归为
+   * "已巩固" —— 两种完全不同的来源用了同一个标签。现在分开:
+   * ignored → 'ignored'(永不进复习队列);mastered → 'consolidated'(按超长间隔回来)。
+   */
+  if (word.status === 'ignored') return 'ignored';
+  if (word.status === 'mastered') return 'consolidated';
   return word.review.reps > 0 ? 'reviewing' : 'pending';
 }
 
@@ -141,13 +152,15 @@ export const WORD_STAGE_LABEL: Record<WordStage, string> = {
   pending: '待复习',
   reviewing: '复习中',
   consolidated: '已巩固',
+  ignored: '已忽略',
 };
 
 /** 阶段说明:徽章旁边要有一句话解释差别,否则用户只能猜(见反馈 D) */
 export const WORD_STAGE_HINT: Record<WordStage, string> = {
   pending: '还没答对过,或上次选「不认识」后等级被重置',
   reviewing: '已答对过,正在按 1/2/4/7… 天的间隔推进',
-  consolidated: `连续答对 ${MASTER_THRESHOLD} 次,已退出常规复习队列`,
+  consolidated: `连续答对 ${MASTER_THRESHOLD} 次,按 60/120/240 天的超长间隔继续复习`,
+  ignored: '你主动标记了「我会了」,不会再出现在复习队列里',
 };
 
 /** 一次复习对某个词产生的**实际结果**(给界面展示,不是调度数据) */

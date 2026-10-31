@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -49,6 +49,8 @@ export function DictCard({
   const { saved, toggle } = useWordSaved(headword);
 
   // 缩放 + 淡入(一次,无 overshoot)。useState 惰性持有 Animated.Value(React Compiler 友好)
+  /** 收藏防连点锁(P1-8):以前没有 busy 态,快速连点会 toggle 两次 */
+  const savingRef = useRef(false);
   const [scale] = useState(() => new Animated.Value(0.92));
   const [fade] = useState(() => new Animated.Value(0));
 
@@ -65,18 +67,25 @@ export function DictCard({
 
   const handleSave = async () => {
     if (!displayWord) return;
-    await toggle({
-      word: result?.query || displayWord,
-      headword: displayWord,
-      // 未收录词:释义留空,先存下来(可在词条详情/复习时补),来源句一并保留
-      phonetic: entry?.phonetic,
-      pos: entry?.pos ?? '',
-      zh: entry?.zh ?? '',
-      en: entry?.en ?? '',
-      example: entry?.example,
-      sourceArticleId: source.articleId,
-      sourceSentence: source.sentence,
-    });
+    // **P1-8**:以前没有 busy 态,快速连点会 toggle 两次(等于没收藏)
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try {
+      await toggle({
+        word: result?.query || displayWord,
+        headword: displayWord,
+        // 未收录词:释义留空,先存下来(可在词条详情/复习时补),来源句一并保留
+        phonetic: entry?.phonetic,
+        pos: entry?.pos ?? '',
+        zh: entry?.zh ?? '',
+        en: entry?.en ?? '',
+        example: entry?.example,
+        sourceArticleId: source.articleId,
+        sourceSentence: source.sentence,
+      });
+    } finally {
+      savingRef.current = false;
+    }
   };
 
   return (

@@ -15,7 +15,7 @@
 
 import { backupFingerprint } from '@/domain/backup';
 import { getAuthState } from '@/domain/auth/store';
-import { getOwnershipStatus, pushBackup } from '@/domain/sync';
+import { getOwnershipStatus, getRemoteUpdatedAt, pushBackup } from '@/domain/sync';
 import { now as clockNow } from '@/domain/clock';
 import { getSyncStateSync, saveSyncState } from '@/storage/sync-state';
 
@@ -59,12 +59,38 @@ export async function maybeAutoSync(): Promise<AutoSyncResult> {
   if (!state.lastHash) {
     return {
       status: 'blocked',
-      reason: '首次同步的方向还没确定 —— 请在账号页选择「用本机数据覆盖云端」或「用云端数据覆盖本机」',
+      reason: '首次同步的方向还没确定 —— 去账号页点「立即同步」(以本机为准)或「从云端恢复」(以云端为准)',
     };
   }
 
   if (state.lastHash === hash) {
     return { status: 'unchanged', reason: '本机数据与上次同步时一致' };
+  }
+
+  /**
+   * **P1-12 冲突检测**:上传前先看一眼云端更新时间。
+   *
+   * 以前只有"上传"没有"下载",两台设备登录同一账号时,后打开 App 的那台会把
+   * 前一台的进度整份覆盖掉,而且没有任何提示。这里做最小拦截:
+   * 如果云端备份的时间晚于本机上次同步时间(说明**另一台设备推过更新的数据**),
+   * 就暂停自动上传,让用户自己决定用哪边。
+   */
+  try {
+    const remoteUpdatedAt = await getRemoteUpdatedAt();
+    if (remoteUpdatedAt) {
+      const remoteMs = Date.parse(remoteUpdatedAt);
+      const localMs = Math.max(state.lastPushedAt, state.lastPulledAt);
+      // 允许 5 秒时钟误差/往返延迟
+      if (Number.isFinite(remoteMs) && remoteMs > localMs + 5_000) {
+        return {
+          status: 'blocked',
+          reason:
+            '云端有更新的数据(可能来自另一台设备),已暂停自动上传以免覆盖。请到账号页选择「从云端恢复」或「立即同步」。',
+        };
+      }
+    }
+  } catch {
+    // 读不到云端时间就不拦(不能因为一次查询失败就停止同步)
   }
 
   try {
