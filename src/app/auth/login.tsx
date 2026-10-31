@@ -6,7 +6,7 @@
  */
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 
 import { AuthShell } from '@/components/auth-shell';
@@ -16,6 +16,7 @@ import { StatusNote } from '@/components/status-note';
 import { ThemedText } from '@/components/themed-text';
 import { isBackendConfigured } from '@/config/backend';
 import { signIn } from '@/domain/auth/store';
+import { probeBackend, type BackendState } from '@/domain/backend-health';
 import { suggestEmail } from '@/domain/email-check';
 import { validateEmail, validatePassword } from '@/domain/auth/validate';
 import { adoptLocalDataToCurrentAccount, autoSyncAfterLogin, planLoginSync, restoreFromCloud } from '@/domain/sync';
@@ -38,6 +39,8 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   const [failure, setFailure] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  /** 云端可用性:进页面探一次,不可用时明确告诉用户「可以离线用」 */
+  const [backend, setBackend] = useState<{ state: BackendState; detail: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const goBack = () => {
@@ -45,6 +48,13 @@ export default function LoginScreen() {
     else router.replace('/(tabs)/profile');
   };
 
+  // 进页面探一次云端(所有 setState 都在 await 之后)
+  useEffect(() => {
+    void (async () => {
+      await Promise.resolve();
+      setBackend(await probeBackend());
+    })();
+  }, []);
   const handleSubmit = async () => {
     const next: { email?: string; password?: string } = {};
     const emailError = validateEmail(email);
@@ -226,6 +236,11 @@ export default function LoginScreen() {
         onSubmitEditing={() => void handleSubmit()}
       />
 
+      {backend && backend.state === 'unreachable' ? (
+        <StatusNote kind="info">
+          {backend.detail}。可以先离线使用本机数据(生词、进度都在本机),云端同步等恢复后再试。
+        </StatusNote>
+      ) : null}
       {failure ? <StatusNote kind="error">{failure}</StatusNote> : null}
       {success ? <StatusNote kind="success">{success}</StatusNote> : null}
 

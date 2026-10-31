@@ -118,7 +118,16 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   } catch (e) {
     clearTimeout(timer);
     const aborted = e instanceof Error && e.name === 'AbortError';
-    throw new AuthError(aborted ? '请求超时,请检查网络后重试' : '网络连接失败,请检查网络后重试', 'network');
+    /**
+     * 网络层失败要给用户可行动的方向。实测踩过的坑:Supabase 项目被删除/暂停后
+     * 域名直接 NXDOMAIN,客户端只能看到「网络连接失败」——用户会一直排查自己的网。
+     */
+    throw new AuthError(
+      aborted
+        ? '请求超时(云端服务响应太慢),可以稍后重试;不影响离线使用本机数据'
+        : '连不上云端服务(网络异常,或云端服务地址已不可用)。不影响离线使用本机数据',
+      'network',
+    );
   }
   clearTimeout(timer);
 

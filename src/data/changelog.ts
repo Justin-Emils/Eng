@@ -21,6 +21,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.15',
+    date: '2026-10-31',
+    title: '云端口不可用时说清原因',
+    notes: [
+      '登录页进页面先探测云端:连不上时明确提示"可以离线使用本机数据",不再只说网络失败',
+      '网络错误文案改成能行动的说法,并区分"超时"与"服务地址不可用"',
+      '仓库补上 docs/supabase-setup.sql:重建云端只需建项目 + 跑一遍 SQL',
+    ],
+  },
+  {
     version: '1.1.14',
     date: '2026-10-27',
     title: '检查更新的可用性改进',
