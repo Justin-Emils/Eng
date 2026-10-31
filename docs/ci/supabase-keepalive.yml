@@ -1,0 +1,50 @@
+# ⚠️ 这个文件是**模板**,不是生效的 workflow。
+#
+# 为什么放在这里:当前 git 凭据是 Personal Access Token,没有 workflow 权限,
+# 无法推送 .github/workflows/ 下的文件(GitHub 会拒绝)。
+#
+# 启用方式(二选一):
+#  A. GitHub 网页:仓库 → Add file → Create new file →
+#     路径填 .github/workflows/supabase-keepalive.yml → 粘贴本文件内容 → Commit
+#  B. 给 token 加上 workflow 权限后,直接把本文件移动到 .github/workflows/ 再推送
+## Supabase 保活:免费项目「约 7 天无活动就暂停」,暂停后域名停止解析,
+# App 会报「连不上云端服务」。这个 workflow 每 2 天打一次公开的健康检查端点,
+# 让项目保持活跃。
+#
+# 说明:
+#  · /auth/v1/health 是公开端点,不需要任何密钥 —— 不用把 key 写进 workflow;
+#  · 公共仓库的 Actions 分钟数免费;
+#  · 如果仓库连续 60 天没有提交,GitHub 会自动停用定时 workflow(会提前发邮件提醒);
+#  · 手动跑:仓库 → Actions → supabase-keepalive → Run workflow。
+#
+# 换了 Supabase 项目时,记得把下面的地址一起改掉(见 docs/backend-ops.md)。
+
+name: supabase-keepalive
+
+on:
+  schedule:
+    # 每 2 天 UTC 03:17 跑一次(避开整点高峰)
+    - cron: '17 3 */2 * *'
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase health endpoint
+        run: |
+          set -u
+          url="https://saqgqexmcrygpyyndknt.supabase.co/auth/v1/health"
+          code=$(curl -s -o /tmp/body -w '%{http_code}' --max-time 25 "$url" || echo "000")
+          echo "HTTP $code"
+          echo "--- body ---"
+          head -c 400 /tmp/body || true
+          echo
+          if [ "$code" = "200" ]; then
+            echo "✅ 项目活跃"
+          else
+            # 暂停时这里通常是 000/503 —— 不标红,但要在日志里看得见,
+            # 方便你从 Actions 历史里判断"什么时候开始停的"。
+            echo "⚠️ 非 200:项目可能又被暂停了,去 dashboard 看状态(docs/backend-ops.md 第 2 节)"
+          fi
