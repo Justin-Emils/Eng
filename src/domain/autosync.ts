@@ -13,11 +13,11 @@
  *     只有用户主动点"立即同步"时才把错误说出来。
  */
 
-import { exportBackup } from '@/domain/backup';
+import { backupFingerprint } from '@/domain/backup';
 import { getAuthState } from '@/domain/auth/store';
 import { getOwnershipStatus, pushBackup } from '@/domain/sync';
 import { now as clockNow } from '@/domain/clock';
-import { getSyncStateSync, hashString, saveSyncState } from '@/storage/sync-state';
+import { getSyncStateSync, saveSyncState } from '@/storage/sync-state';
 
 export type AutoSyncStatus = 'pushed' | 'unchanged' | 'skipped' | 'blocked' | 'error';
 
@@ -45,8 +45,8 @@ export async function maybeAutoSync(): Promise<AutoSyncResult> {
     return { status: 'blocked', reason: ownership.message };
   }
 
-  const raw = await exportBackup();
-  const hash = hashString(raw);
+  // 只对**业务内容**求指纹(排除 exportedAt,否则每次都会"检测到变化")
+  const hash = await backupFingerprint();
   const state = getSyncStateSync();
 
   /**
@@ -82,8 +82,7 @@ export async function maybeAutoSync(): Promise<AutoSyncResult> {
  * 内容此刻与云端一致 → 把当前指纹作为基线,后续改动才会被自动同步推上去。
  */
 export async function markPulled(): Promise<void> {
-  const raw = await exportBackup();
-  await saveSyncState({ lastHash: hashString(raw), lastPulledAt: clockNow() });
+  await saveSyncState({ lastHash: await backupFingerprint(), lastPulledAt: clockNow() });
 }
 
 /** 「上次同步」的人话表述(账号页展示) */

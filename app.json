@@ -2,7 +2,7 @@
   "expo": {
     "name": "article-reading",
     "slug": "article-reading",
-    "version": "1.1.15",
+    "version": "1.1.16",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "articlereading",
@@ -17,7 +17,7 @@
     },
     "android": {
       "package": "com.articlereading.selfstudy",
-      "versionCode": 17,
+      "versionCode": 18,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

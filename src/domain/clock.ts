@@ -18,7 +18,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { REST_BASE, SUPABASE_KEY } from '@/config/backend';
+import { SUPABASE_KEY, SUPABASE_URL } from '@/config/backend';
 
 const OFFSET_KEY = 'readingapp.clockoffset.v1';
 
@@ -105,11 +105,19 @@ export interface ClockSyncResult {
 export async function syncClock(): Promise<ClockSyncResult> {
   const t0 = Date.now();
   try {
-    const res = await fetch(`${REST_BASE}/auth/v1/health`, {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/health`, {
       method: 'GET',
       headers: { apikey: SUPABASE_KEY },
     });
     const t1 = Date.now();
+    /**
+     * 必须检查 res.ok（P1-1）。以前 URL 拼成了 `${REST_BASE}/auth/v1/health`
+     * （= /rest/v1/auth/v1/health）→ 404，但因为 404 响应也带 Date 头，校准"碰巧"能用。
+     * 现在 URL 正确，同时把非 2xx 明确当作失败，不再依赖巧合。
+     */
+    if (!res.ok) {
+      return { ok: false, offsetMs, serverTime: '', error: `校准接口返回 ${res.status}` };
+    }
     const header = res.headers.get('date');
     if (!header) {
       return { ok: false, offsetMs, serverTime: '', error: '服务器未返回 Date 头' };

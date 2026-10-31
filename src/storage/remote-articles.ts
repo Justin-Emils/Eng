@@ -6,16 +6,16 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { todayKey } from '@/domain/clock';
 import type { Article } from '@/types';
 
 const KEY = 'readingapp.remote.v1';
 
-export function dateKey(now = new Date()): string {
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, '0');
-  const d = String(now.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
+/**
+ * 日期键。与打卡/学习记录共用 `domain/clock` 的**校准时间**（P1-1）。
+ * 以前这里是第三份本机时间副本，导致"语料更新日期"与"学习日期"可能对不上。
+ */
+export const dateKey = (now: Date = new Date()) => todayKey(now);
 
 interface StoreShape {
   updatedDate: string;

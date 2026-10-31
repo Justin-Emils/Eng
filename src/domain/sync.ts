@@ -11,12 +11,13 @@
 import { REST_BASE, SUPABASE_KEY } from '@/config/backend';
 import { AuthError } from '@/domain/auth/api';
 import { ensureAccessToken, getAuthState } from '@/domain/auth/store';
-import { exportBackup, importBackup } from '@/domain/backup';
+import { backupFingerprint, exportBackup, importBackup } from '@/domain/backup';
+import { decideLoginSync } from '@/domain/login-sync';
 import { checkOwnership, type OwnershipCheck } from '@/domain/ownership';
 import { DEFAULT_AVATAR, getAccount, saveAccount } from '@/storage/account';
 import { bindLocalOwner, getLocalOwnerSync } from '@/storage/local-owner';
 import { getSettings } from '@/storage/settings';
-import { hashString, saveSyncState } from '@/storage/sync-state';
+import { saveSyncState } from '@/storage/sync-state';
 import { now } from '@/domain/clock';
 import { getWords } from '@/storage/words';
 
@@ -175,7 +176,7 @@ export async function pushBackup(): Promise<void> {
    * 自动同步靠它判断"本机从那以后有没有改动";没有基线时自动同步不会做第一次上传
    * —— 那等于静默决定"以本机为准",必须由用户先定方向(见 domain/autosync)。
    */
-  await saveSyncState({ lastHash: hashString(raw), lastPushedAt: now() });
+  await saveSyncState({ lastHash: await backupFingerprint(), lastPushedAt: now() });
 }
 
 /** 读取云端备份(没有则返回 null) */
@@ -237,6 +238,8 @@ export interface LoginSyncPlan {
   remoteUpdatedAt: string;
   /** 本机数据的归属与当前账号冲突 */
   ownershipConflict: boolean;
+  /** 读取云端失败的原因(空串=读取成功)。读失败时**绝不能**当作"云端为空" */
+  remoteError: string;
   /** 云端备份原文(取用云端时直接用它恢复,避免再请求一次) */
   remoteRaw: string;
   /** 无需询问时的自动动作;为 null 表示必须问用户 */
@@ -251,11 +254,16 @@ export async function planLoginSync(): Promise<LoginSyncPlan> {
   const localHasData = localWords > 0;
 
   let remote: RemoteBackup | null = null;
+  let remoteError = '';
   try {
     remote = await pullBackup();
-  } catch {
-    // 云端读失败时按"没有备份"处理:不会因此覆盖任何东西(见下面的分支)
-    remote = null;
+  } catch (e) {
+    /**
+     * **P0-2**:以前这里把读失败当成"云端没有备份"(remote = null),
+     * 于是下一次判断进入"自动上传"分支 —— 一次 GET 抖动就把云端备份换成本机旧数据,
+     * 还提示"已同步到云端"。现在把失败原因带出去,决策层会一律转成"问用户"。
+     */
+    remoteError = e instanceof Error ? e.message : '网络异常';
   }
 
   const ownership = await getOwnershipStatus().catch(() => null);
@@ -268,30 +276,21 @@ export async function planLoginSync(): Promise<LoginSyncPlan> {
     remoteWords: remote?.wordCount ?? 0,
     remoteUpdatedAt: remote?.updatedAt ?? '',
     ownershipConflict,
+    remoteError,
     remoteRaw: remote?.raw ?? '',
   };
 
-  if (ownershipConflict) {
-    return {
-      ...base,
-      auto: null,
-      message: `本机数据属于 ${ownership?.ownerEmail || '另一个账号'}。请选择用哪边的数据,或先去账号页解除归属。`,
-    };
-  }
-  if (!localHasData && base.remoteHasBackup) {
-    return { ...base, auto: 'restore', message: `云端有 ${base.remoteWords} 个生词,本机是空的,将自动恢复` };
-  }
-  if (!localHasData) {
-    return { ...base, auto: 'bind', message: '本机与云端都没有数据,将从零开始' };
-  }
-  if (!base.remoteHasBackup) {
-    return { ...base, auto: 'upload', message: `本机有 ${localWords} 个生词,云端为空,将自动上传` };
-  }
-  return {
-    ...base,
-    auto: null,
-    message: `本机有 ${localWords} 个生词,云端有 ${base.remoteWords} 个 —— 两边都有数据,请选择以哪边为准。`,
-  };
+  // 决策逻辑是纯函数(见 domain/login-sync.ts),有可执行用例盯着
+  const decision = decideLoginSync({
+    localHasData,
+    localWords,
+    remoteHasBackup: base.remoteHasBackup,
+    remoteWords: base.remoteWords,
+    remoteError,
+    ownershipConflict,
+    ownerEmail: ownership?.ownerEmail ?? '',
+  });
+  return { ...base, ...decision };
 }
 
 /** 上传昵称 / 头像(登录后个人资料也进云端,换手机才带得走) */

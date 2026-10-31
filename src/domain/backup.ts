@@ -10,6 +10,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { businessFingerprint } from '@/domain/fingerprint';
 import { bindLocalOwner, getLocalOwnerSync } from '@/storage/local-owner';
 
 /** 需要备份的存储键(与各 storage 模块保持一致) */
@@ -71,6 +72,16 @@ export async function exportBackup(): Promise<string> {
   return JSON.stringify(payload);
 }
 
+/**
+ * 当前业务内容的稳定指纹(供自动同步判断"有没有变化")。
+ *
+ * 注意:这里**不能**用 exportBackup() 的整份 JSON 求哈希 —— 那份 JSON 带
+ * exportedAt,每次都不一样,指纹会永远变化(见 domain/fingerprint.ts 的说明)。
+ */
+export async function backupFingerprint(): Promise<string> {
+  const pairs = await AsyncStorage.multiGet([...BACKUP_KEYS]);
+  return businessFingerprint(getLocalOwnerSync()?.accountId ?? '', pairs);
+}
 /** 备份摘要(给 UI 展示:包含哪些内容、多大) */
 export function describeBackup(raw: string): string {
   const payload = parseBackup(raw);

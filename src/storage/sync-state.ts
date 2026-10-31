@@ -68,14 +68,5 @@ export function syncStateHydrated(): boolean {
   return hydrated;
 }
 
-/**
- * 内容指纹(djb2):同一份备份永远得到同一个值。
- * 不追求抗碰撞 —— 它只用来判断"本机数据有没有变",不是安全校验。
- */
-export function hashString(input: string): string {
-  let hash = 5381;
-  for (let i = 0; i < input.length; i += 1) {
-    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
-  }
-  return (hash >>> 0).toString(16);
-}
+/** 内容指纹:实现移到 domain/hash.ts(纯函数,验证脚本可直接跑);这里再导出保持兼容 */
+export { hashString } from '@/domain/hash';

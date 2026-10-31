@@ -21,6 +21,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.16',
+    date: '2026-10-31',
+    title: '数据安全修复(诊断报告 P0)',
+    notes: [
+      '同步指纹不再包含导出时间:内容没变就不会再每 60 秒覆盖一次云端',
+      '云端读取失败不再被当成"云端为空":失败时一律先问,绝不自动上传覆盖',
+      '登录同步方向的决策抽成纯函数并加了 8 项可执行用例',
+      '改用正式签名证书打 Release 包(此前是公开的 debug 证书,任何人都能签同名包)',
+    ],
+  },
+  {
     version: '1.1.15',
     date: '2026-10-31',
     title: '云端口不可用时说清原因',
