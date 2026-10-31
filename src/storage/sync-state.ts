@@ -55,14 +55,6 @@ export async function saveSyncState(patch: Partial<SyncState>): Promise<void> {
   }
 }
 
-export async function clearSyncState(): Promise<void> {
-  cache = EMPTY;
-  try {
-    await AsyncStorage.removeItem(SYNC_STATE_KEY);
-  } catch {
-    // 忽略
-  }
-}
 
 export function syncStateHydrated(): boolean {
   return hydrated;

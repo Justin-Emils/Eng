@@ -11,6 +11,8 @@
 import { REST_BASE, SUPABASE_KEY } from '@/config/backend';
 import { AuthError } from '@/domain/auth/api';
 import { ensureAccessToken, getAuthState } from '@/domain/auth/store';
+import { Platform } from 'react-native';
+
 import { backupFingerprint, exportBackup, importBackup } from '@/domain/backup';
 import { TimeoutError, fetchWithTimeout } from '@/domain/net';
 import { decideLoginSync } from '@/domain/login-sync';
@@ -172,7 +174,7 @@ export async function pushBackup(): Promise<void> {
       user_id: userId,
       payload: JSON.parse(raw) as Record<string, unknown>,
       schema_version: 1,
-      device: 'android',
+      device: Platform.OS,  // 以前写死 'android'，iOS 用户云端也显示 android
     },
   });
   /**

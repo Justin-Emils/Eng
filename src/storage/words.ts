@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { markLearned, unmarkLearnedToday } from '@/storage/learning';
 import { now as clockNow } from '@/domain/clock';
+import { readJsonSafe, StorageCorruptError } from '@/storage/safe-read';
 
 import { makeWordItem, type NewWordInput } from '@/domain/words';
 import { isDue } from '@/domain/srs';
@@ -20,22 +21,20 @@ const STORAGE_VERSION_KEY = 'readingapp.storage.version';
 
 /** 读取全部生词(按加入时间倒序,新的在前) */
 export async function getWords(): Promise<WordItem[]> {
-  try {
-    const raw = await AsyncStorage.getItem(WORDS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as WordItem[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.sort((a, b) => b.addedAt - a.addedAt);
-  } catch {
-    return [];
+  /**
+   * **P2-11**:以前解析失败也 `return []`,而下一次保存是"先读再写" ——
+   * 一次损坏就会把全量生词覆盖成"仅这一条"。现在损坏会**抛错**,
+   * 写操作随之中止(宁可不写,也不毁数据),原始值已备份到 readingapp.corrupt.*。
+   */
+  const parsed = await readJsonSafe<WordItem[]>(WORDS_KEY);
+  if (parsed == null) return [];
+  if (!Array.isArray(parsed)) {
+    throw new StorageCorruptError(WORDS_KEY, '结构不是数组');
   }
+  return parsed.sort((a, b) => b.addedAt - a.addedAt);
 }
 
 /** 按 id 查一个生词 */
-export async function getWordById(id: string): Promise<WordItem | undefined> {
-  const words = await getWords();
-  return words.find((w) => w.id === id);
-}
 
 /** 保存一个生词(存在则覆盖同 id 条目) */
 export async function saveWord(word: WordItem): Promise<void> {
@@ -103,7 +102,8 @@ export async function countByStatus(): Promise<{
   total: number;
 }> {
   const words = await getWords();
-  const now = Date.now();
+  // 与 getDueWords 一致：统一用校准时间，否则同一时刻两处到期数可能不同
+  const now = clockNow();
   return {
     due: words.filter((w) => isDue(w, now)).length,
     learning: words.filter((w) => w.status === 'learning' || w.status === 'new').length,

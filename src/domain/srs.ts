@@ -111,13 +111,6 @@ export function isDue(word: WordItem, now = Date.now()): boolean {
 /**
  * 复习会话结束时的小结输入。
  */
-export interface SessionSummary {
-  total: number;
-  remembered: number; // good/easy 次数
-  fuzzy: number; // hard 次数
-  forgotten: number; // again 次数
-  masteredNew: number;
-}
 
 // ─────────────────────────── 阶段与结果(界面共用的说法) ───────────────────────────
 
@@ -217,20 +210,3 @@ export function describeDue(dueAt: number, now = Date.now()): string {
 }
 
 /** 由一次会话内的反馈序列汇总出总结 */
-export function summarizeGrades(grades: ReviewGrade[]): SessionSummary {
-  let remembered = 0;
-  let fuzzy = 0;
-  let forgotten = 0;
-  for (const g of grades) {
-    if (g === 'again') forgotten += 1;
-    else if (g === 'hard') fuzzy += 1;
-    else remembered += 1;
-  }
-  return {
-    total: grades.length,
-    remembered,
-    fuzzy,
-    forgotten,
-    masteredNew: 0,
-  };
-}

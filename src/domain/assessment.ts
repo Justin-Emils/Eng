@@ -188,18 +188,3 @@ export function estimateFromRounds(rounds: BandResult[]): AssessEstimate | null 
   };
 }
 
-export function estimateFromPick(thresholdOrVocab: number): AssessEstimate {
-  const isBand = VOCAB_BANDS.includes(thresholdOrVocab as (typeof VOCAB_BANDS)[number]);
-  const vocab = Math.max(
-    MIN_ASSESSMENT_VOCAB,
-    Math.min(MAX_ASSESSMENT_VOCAB, thresholdOrVocab),
-  );
-  return {
-    vocab,
-    level: vocabToCefr(vocab),
-    finalThreshold: vocab,
-    totalWords: 0,
-    knownWords: 0,
-    bandLabel: isBand ? bandLabel(thresholdOrVocab) : `Level ${vocab} words`,
-  };
-}

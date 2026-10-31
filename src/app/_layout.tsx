@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { ErrorBoundary } from '@/components/error-boundary';
 import { UpdateDialog } from '@/components/update-dialog';
 import { APP_FONTS } from '@/constants/fonts';
 import { hydrateRemoteArticles } from '@/data/articles/remote-registry';
@@ -147,16 +148,19 @@ export default function RootLayout() {
     void SystemUI.setBackgroundColorAsync(palette.background).catch(() => {});
   }, [palette.background]);
 
+  // P2-12:兜住渲染异常,避免生产环境白屏;错误会记到 readingapp.crashlog.v1
   return (
-    <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-      </Stack>
-      {/* 启动后自动检查更新(6 小时节流;没有新版本时它什么都不渲染) */}
-      <UpdateDialog />
-      {/* 两个条件都满足才淡出:启动数据就绪 + 内嵌字体已加载 */}
-      <AnimatedSplashOverlay ready={bootChecked && fontsLoaded} />
-    </ThemeProvider>
+    <ErrorBoundary>
+      <ThemeProvider value={isDark ? DarkTheme : DefaultTheme}>
+        <StatusBar style="auto" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+        </Stack>
+        {/* 启动后自动检查更新(6 小时节流;没有新版本时它什么都不渲染) */}
+        <UpdateDialog />
+        {/* 两个条件都满足才淡出:启动数据就绪 + 内嵌字体已加载 */}
+        <AnimatedSplashOverlay ready={bootChecked && fontsLoaded} />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }

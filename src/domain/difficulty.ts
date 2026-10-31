@@ -115,25 +115,8 @@ export function difficultyOf(article: Article): ArticleDifficultyInfo {
  *  -  >12%   偏难(阅读体验差);
  *  -  <2%    偏简单(学不到新词)。
  */
-export function unknownTokenRate(paragraphs: readonly string[], userVocab: number): number {
-  const tokens = extractWords(paragraphs.join(' '));
-  if (tokens.length === 0) return 0;
-  let hard = 0;
-  for (const t of tokens) {
-    if (thresholdOf(t) > userVocab) hard += 1;
-  }
-  return hard / tokens.length;
-}
 
 /** 按"档差"给一句人话评价(档差 = 文章档 - 用户档) */
-export function fitLabel(bandGapValue: number): string {
-  if (bandGapValue <= -2) return '偏简单';
-  if (bandGapValue === -1) return '稍简单';
-  if (bandGapValue === 0) return '刚好合适';
-  if (bandGapValue === 1) return '略有挑战';
-  if (bandGapValue === 2) return '偏难';
-  return '太难';
-}
 
 /* ------------------------------------------------------------------ *
  * 量化匹配:预测理解率 + 可学词
@@ -142,9 +125,6 @@ export function fitLabel(bandGapValue: number): string {
  * ------------------------------------------------------------------ */
 
 /** 预测理解率 = 该词汇量下能认识的 running words 比例(1 - 生词率) */
-export function coverageAt(paragraphs: readonly string[], userVocab: number): number {
-  return 1 - unknownTokenRate(paragraphs, userVocab);
-}
 
 /**
  * 按理解率给一句人话评价(取代按档差的旧口径)。

@@ -53,7 +53,3 @@ export function setCorpusFailed(message: string) {
   setStatus({ kind: 'failed', detail: message || '更新失败,请检查网络后重试', updatedAt: Date.now() });
 }
 
-export function resetCorpusStatus() {
-  status = DEFAULT_STATUS;
-  listeners.forEach((l) => l());
-}

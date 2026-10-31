@@ -1,4 +1,3 @@
-import Constants from 'expo-constants';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,6 +17,7 @@ import {
   THEME_META,
   type ThemeId,
 } from '@/constants/theme';
+import { APP_VERSION } from '@/domain/app-version';
 import { wordsToCsv } from '@/domain/export';
 import { DEFAULT_USER_VOCAB } from '@/domain/levels';
 import { useDailyCorpus } from '@/hooks/use-daily-corpus';
@@ -74,7 +74,7 @@ export default function SettingsScreen() {
    * (之前正是这个原因:tag 一路发到 v1.0.12,而这里一直显示 1.0.0)。
    * 开发环境下额外标注「开发版」,方便和 GitHub 上已发布的 Release 区分。
    */
-  const appVersionText = `${String(Constants.expoConfig?.version ?? '未知')}${__DEV__ ? '(开发版)' : ''}`;
+  const appVersionText = `v${APP_VERSION}${__DEV__ ? '(开发版)' : ''}`;
 
   /**
    * 隐藏开发者入口:在「关于 → 版本」上连点 5 次进入 /dev。
@@ -331,6 +331,12 @@ export default function SettingsScreen() {
             sublabel="CSV 复制到剪贴板,可粘到 Excel / 备忘录"
             value={exported ? '✓ 已复制' : undefined}
             onPress={() => void handleExport()}
+          />
+          <SettingRow
+            label="隐私政策与用户协议"
+            sublabel="收集哪些数据、存在哪里(含数据出境说明)"
+            value="查看 ›"
+            onPress={() => router.push('/legal')}
           />
           <SettingRow
             label="清空生词本"

@@ -47,7 +47,8 @@ export function computeStats(input: StatsInput): LearningStats {
     totalArticlesCompleted: input.allReadArticles.length,
     totalWordsRead: sumWords(input.allReadArticles),
     wordCount: input.words.length,
-    masteredCount: input.words.filter((w) => w.status === 'mastered').length,
+    // 与首页口径一致：用户主动「我会了」(ignored) 也算已掌握，否则同一个词在不同页面数字不同
+    masteredCount: input.words.filter((w) => w.status === 'mastered' || w.status === 'ignored').length,
     streakDays: input.streakDays,
   };
 }

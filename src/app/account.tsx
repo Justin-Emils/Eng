@@ -596,7 +596,7 @@ export default function AccountScreen() {
               />
               <SettingRow
                 label="同步内容"
-                sublabel={`生词本、复习进度、阅读记录、每日目标、设置、昵称头像 · 本机现有 ${wordCount} 个生词`}
+                sublabel={`生词本、复习进度、阅读记录、每日目标、设置、昵称 · 本机现有 ${wordCount} 个生词（相册头像不同步，emoji 头像会同步）`}
                 last
               />
             </>
@@ -613,7 +613,7 @@ export default function AccountScreen() {
         <ThemedView type="backgroundElement" style={styles.list}>
           <SettingRow
             label="导出学习数据"
-            sublabel="生词本、复习进度、阅读记录、打卡、设置、头像 → 复制到剪贴板"
+            sublabel="生词本、复习进度、阅读记录、打卡、设置、昵称 → 复制到剪贴板（不含图片头像）"
             value={backupBusy ? '处理中…' : '导出 ›'}
             onPress={() => {
               if (!backupBusy) void handleExport();

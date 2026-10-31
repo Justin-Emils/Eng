@@ -22,8 +22,8 @@
 | P1-10 | 同步/更新请求无超时 | ✅ 完成 |
 | P1-11 | 已巩固永久退出复习 | ✅ 完成 |
 | P1-12 | 跨设备只上不下 | ✅ 完成 |
-| P2 | 合规 / 安全 / 稳定性 / 商业成熟度 | ⏳ |
-| P3 | 文档漂移 / 死代码 / 代码卫生 | ⏳ |
+| P2 | 合规 / 安全 / 稳定性 | ✅ 代码部分完成(法务/后端项见下) |
+| P3 | 文档漂移 / 死代码 / 代码卫生 | ✅ 完成(个别项见下) |
 
 ---
 
@@ -205,3 +205,35 @@ node scripts/verify-article-merge.mjs   # 12
 node scripts/verify-email.mjs           # 31
 npx tsc --noEmit ; npx eslint src       # 0 errors / 0 warnings
 ```
+
+
+---
+
+## P2(代码部分)
+
+| 项 | 处置 | 证据 |
+|---|---|---|
+| P2-11 存储损坏被当空数据 | 新增 `storage/safe-read.ts`:`readJsonSafe` 区分"没有数据"与"解析失败",损坏时把原值另存 `readingapp.corrupt.<key>.<ts>` 并**抛错**(写操作随之中止);`getWords` 已接入 | `npx tsc` 通过;逻辑见文件头注释 |
+| P2-12 白屏/无崩溃记录 | 新增 `components/error-boundary.tsx`(捕获渲染异常 + 重试 + 写 `readingapp.crashlog.v1` 最多 20 条),在 `_layout` 包裹整个 App | 已挂载于根布局 |
+| P2-1 隐私政策/协议缺失 | 新增 `/legal` 页(隐私政策、用户协议、**数据出境说明**),设置页入口;文中如实写"自助注销尚未提供" | 页面可访问 |
+| P2-3b Auto Backup | `app.json` → `android.allowBackup: false` | 配置已生效 |
+| P2-3d 多余权限 | `app.json` → `android.blockedPermissions` 屏蔽 SYSTEM_ALERT_WINDOW / READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE | 配置已生效 |
+| P2-14 依赖漏写 | `package.json` 补 `expo-file-system`(被 avatar.ts import 但没声明) | 依赖数 29 |
+| P2-6 登录错误枚举 | 登录错误已是统一文案「邮箱或密码不正确」;注册仍会暴露"已注册",需邮箱验证才能彻底解决 | 见 api.ts |
+| P3 死代码 | 删除 `estimateFromPick`、`summarizeGrades`/`SessionSummary`、`fitLabel`/`coverageAt`/`unknownTokenRate`、`isKaoyanHighlightWord`、`resetCorpusStatus`、`clearSyncState`、`getWordById`;删 `src/data/_check.txt` | tsc 0 错误 |
+| P3 口径不一致 | `countByStatus` 改用校准时间;`analytics.masteredCount` 与首页统一(含 ignored);`pushBackup` 的 device 改 `Platform.OS` | — |
+| P3 多处文档漂移 | README"数据全部本地"→ 离线优先+可选云同步;account 页"同步/导出含头像"→ 不含图片头像;`supabase/schema.sql` 标注废弃、指向 `docs/supabase-setup.sql` | — |
+| P3 多选跨筛选残留 | 切换筛选时清空已选 | — |
+
+**受限于外部条件、未完成的项(如实记录)**
+
+| 项 | 为什么没做 | 需要什么 |
+|---|---|---|
+| P2-2 账号注销 | 需要服务端删除用户的能力(Supabase 需 Edge Function / service_role,客户端拿不到) | 后端加一个删除接口;当前 `legal` 页已写"人工删除" |
+| P2-3a Token 存 SecureStore | 需要新增 `expo-secure-store` 依赖并重新安装 | `npx expo install expo-secure-store`(需联网) |
+| P2-3c Release 开 R8/minify | 开启后需配套 proguard 规则,当前构建未验证过,贸然开会让线上崩溃 | 单独一轮构建验证 |
+| P2-9 应用内自动更新 | 需 `REQUEST_INSTALL_PACKAGES` + FileProvider + 签名一致性,当前走浏览器下载 | 产品决策 |
+| P2-13 CI | 加 `.github/workflows` 需要 token 的 `workflow` 权限(当前被 GitHub 拒绝) | 网页创建或换 token |
+| P2-15 版本 tag | 已在本地打 tag,推送受网络影响 | 网络恢复后 `git push --tags` |
+| 5.3 功能缺口(TTS/提醒/报告/错题/搜索/字号持久化/撤销) | 每项都是独立功能,不属于"修复缺陷" | 排期 |
+| 5.1 法务文本 | `legal` 页是**草稿**,上线前需法务审阅 | 法务 |

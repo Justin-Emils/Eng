@@ -184,7 +184,11 @@ export default function WordsScreen() {
               return (
                 <Pressable
                   key={f.id}
-                  onPress={() => setFilter(f.id)}
+                  onPress={() => {
+                    // 切换筛选时清空已选:否则批量操作会作用到当前不可见的词
+                    setSelected(new Set());
+                    setFilter(f.id);
+                  }}
                   style={({ pressed }) => pressed && styles.pressed}>
                   <ThemedView
                     type={active ? 'backgroundSelected' : 'backgroundElement'}
