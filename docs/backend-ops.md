@@ -32,7 +32,24 @@
 
 三种应对,按省事程度排:
 
-### ① 保活 workflow(已配好,推荐)
+### ① 本机计划任务(已在这台电脑上配好)
+
+Windows 计划任务 **EngSupabaseKeepAlive** 每天 10:00 跑一次
+`scripts/keepalive.ps1`(带 apikey 打 `/auth/v1/health`,日志写 `.artifacts/keepalive.log`)。
+
+- 查看:`Get-ScheduledTaskInfo -TaskName EngSupabaseKeepAlive`
+- 立即跑:`Start-ScheduledTask -TaskName EngSupabaseKeepAlive`
+- 重建(换电脑时):
+
+  ```powershell
+  $action  = New-ScheduledTaskAction -Execute 'powershell.exe' `
+               -Argument '-NoProfile -ExecutionPolicy Bypass -File "E:\code\Eng\article-reading\scripts\keepalive.ps1"'
+  $trigger = New-ScheduledTaskTrigger -Daily -At '10:00'
+  Register-ScheduledTask -TaskName EngSupabaseKeepAlive -Action $action -Trigger $trigger -Force
+  ```
+- ⚠️ 限制:**电脑关机/休眠时不会跑**;默认也要求"用户已登录"。
+
+### ② 保活 workflow(电脑关机也能保活,推荐配合上面一起用)
 
 `docs/ci/supabase-keepalive.yml` —— 每 2 天用 GitHub Actions 打一次
 `/auth/v1/health`(不需要密钥,公开端点),让项目保持活跃。
