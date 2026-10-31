@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -56,6 +56,8 @@ export default function WordsScreen() {
   );
   /** 多选模式:行点击变成"选中",底部出现批量操作栏 */
   const [selectMode, setSelectMode] = useState(false);
+  /** 搜索框(P2 缺口:词多了以后只能按状态筛,定位不到具体的词) */
+  const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 
   /**
@@ -91,6 +93,14 @@ export default function WordsScreen() {
   };
 
   const visible = (words ?? []).filter((w) => {
+    const q = search.trim().toLowerCase();
+    if (q) {
+      const hit =
+        w.headword.toLowerCase().includes(q) ||
+        (w.zh ?? '').includes(search.trim()) ||
+        (w.en ?? '').toLowerCase().includes(q);
+      if (!hit) return false;
+    }
     if (filter === 'todo') return stageOf(w) !== 'consolidated';
     if (filter === 'done') return stageOf(w) === 'consolidated';
     if (filter === 'today') return addedOn(w) === todayKey();
@@ -169,6 +179,20 @@ export default function WordsScreen() {
         ) : null}
 
         {/* 筛选(C2):只看未掌握 / 只看已掌握 / 今日新增 */}
+        {words && words.length > 0 ? (
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="搜索生词(英文或中文)"
+            placeholderTextColor={theme.textSecondary}
+            style={[
+              styles.searchInput,
+              { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            ]}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        ) : null}
         {words && words.length > 0 ? (
           <View style={styles.filterRow}>
             {FILTERS.map((f) => {
@@ -447,6 +471,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     borderWidth: 1,
     borderColor: 'transparent',
+  },
+  searchInput: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: Spacing.three,
+    fontSize: 15,
+    marginTop: Spacing.one,
   },
   filterRow: {
     flexDirection: 'row',

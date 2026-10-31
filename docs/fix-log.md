@@ -237,3 +237,20 @@ npx tsc --noEmit ; npx eslint src       # 0 errors / 0 warnings
 | P2-15 版本 tag | 已在本地打 tag,推送受网络影响 | 网络恢复后 `git push --tags` |
 | 5.3 功能缺口(TTS/提醒/报告/错题/搜索/字号持久化/撤销) | 每项都是独立功能,不属于"修复缺陷" | 排期 |
 | 5.1 法务文本 | `legal` 页是**草稿**,上线前需法务审阅 | 法务 |
+
+
+---
+
+## 第二轮补充(1.1.18 / 1.1.19)
+
+| 项 | 处置 | 证据 |
+|---|---|---|
+| **发音 / TTS**(报告列为第一优先级缺口) | 新增 `domain/speech.ts`(expo-speech,en-US、词速 0.85、先 stop 再 speak);点词卡片、词条详情、复习卡三处 🔊 可点 | 三处 `speak(` 调用点;包内已含 expo-speech |
+| **生词搜索** | 生词本顶部搜索框,按英文/中文/英文释义过滤 | `words.tsx` 的 `search` 状态 + `visible` 过滤 |
+| **字号持久化** | `settings.fontSize` + `saveFontSize()`;阅读页挂载读取、A± 写回 | 独立 useEffect 读取,避免污染 Promise.all |
+| **删除云端数据**(P2-2 可落地部分) | `sync.deleteCloudData()` 删除 backups / profiles 行并清空同步基线;账号页新增入口,文案如实说明"登录身份需人工删除" | 账号页「删除云端学习数据」 |
+| **Token 存安全存储**(P2-3a) | `storage/session.ts` 改用 `expo-secure-store`,自动从旧 AsyncStorage 迁移并删除明文;SecureStore 超限时回退 AsyncStorage(保证能登录) | 包内含 secure_store 备份/提取规则 |
+| **CI**(P2-13) | `docs/ci/ci.yml` 模板:tsc + eslint + 5 个 verify 脚本(75 项断言) | 模板已入库(推 `.github/workflows` 需 workflow 权限) |
+| **R8 / minify**(P2-3c) | **试了,决定不开**:构建能过,但包体 48.66→48.84 MB(反而略增),且无法真机验证混淆是否破坏运行时。交付版保持 R8 关闭,1.1.18 仅作试验包 | 两版体积对比 |
+
+**仍未做(需要决策或服务端能力)**:账号注销(需 Edge Function/service_role)、应用内自动更新、TTS 语速/口音设置、复习提醒(需 expo-notifications)、学习报告/错题本、撤销、法务文本定稿。

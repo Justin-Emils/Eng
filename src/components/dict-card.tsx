@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { speak } from '@/domain/speech';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, Spacing } from '@/constants/theme';
 import type { LookupResult } from '@/domain/dictionary';
@@ -114,11 +115,15 @@ export function DictCard({
                     <ThemedText type="subtitle" style={styles.word}>
                       {entry.headword}
                     </ThemedText>
-                    {entry.phonetic ? (
-                      <ThemedText type="small" themeColor="textSecondary">
-                        /{entry.phonetic}/
+                    <Pressable
+                      onPress={() => void speak(entry.headword)}
+                      hitSlop={10}
+                      style={({ pressed }) => pressed && styles.pressed}>
+                      <ThemedText type="small" themeColor="accent">
+                        {entry.phonetic ? `/${entry.phonetic}/` : '听听发音'}
+                        {'  '}🔊
                       </ThemedText>
-                    ) : null}
+                    </Pressable>
                   </View>
                   <ThemedText type="smallBold" themeColor="accent">
                     {entry.pos}

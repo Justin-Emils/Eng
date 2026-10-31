@@ -32,6 +32,7 @@ import { addCheckin } from '@/storage/checkins';
 import { getAllKnown, getAllLearned, getLearnedToday } from '@/storage/learning';
 import { getReadingProgress, markArticleCompleted, saveReadingProgress } from '@/storage/progress';
 import { getUserLevel } from '@/storage/user';
+import { getSettings, saveFontSize } from '@/storage/settings';
 
 const MIN_FONT = 16;
 const MAX_FONT = 28;
@@ -130,6 +131,21 @@ export default function ArticleReaderScreen() {
       active = false;
     };
   }, [article]);
+
+  /** 字号持久化(P2 缺口):以前只存在组件 state,退出即回到 19 */
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const settings = await getSettings();
+      if (!active) return;
+      if (typeof settings.fontSize === 'number') {
+        setFontSize(Math.min(MAX_FONT, Math.max(MIN_FONT, settings.fontSize)));
+      }
+    })().catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // 全篇候选生词集合(标蓝):门槛高于用户词汇量 且 未学 且 未会
   const candidateSet = useMemo(() => {
@@ -404,7 +420,13 @@ export default function ArticleReaderScreen() {
         </ThemedText>
         <View style={styles.fontControls}>
           <Pressable
-            onPress={() => setFontSize((s) => Math.max(MIN_FONT, s - 1))}
+            onPress={() =>
+                setFontSize((s) => {
+                  const next = Math.max(MIN_FONT, s - 1);
+                  void saveFontSize(next);
+                  return next;
+                })
+              }
             style={({ pressed }) => [
               styles.fontBtn,
               { borderRadius: skin.radiusPanel },
@@ -413,7 +435,13 @@ export default function ArticleReaderScreen() {
             <ThemedText type="smallBold">A−</ThemedText>
           </Pressable>
           <Pressable
-            onPress={() => setFontSize((s) => Math.min(MAX_FONT, s + 1))}
+            onPress={() =>
+                setFontSize((s) => {
+                  const next = Math.min(MAX_FONT, s + 1);
+                  void saveFontSize(next);
+                  return next;
+                })
+              }
             style={({ pressed }) => [
               styles.fontBtn,
               { borderRadius: skin.radiusPanel },

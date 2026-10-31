@@ -392,6 +392,22 @@ export async function autoSyncAfterLogin(): Promise<{ restored: boolean; note: s
   };
 }
 
+
+/**
+ * 删除当前账号在云端的**数据行**(备份 + 资料)(P2-2)。
+ *
+ * 能删到哪一步:backups / profiles 两张表的行可以删(RLS 允许用户删自己的行)。
+ * **删不掉的是 auth.users 里的登录身份** —— 那需要 service_role 或 Edge Function。
+ * 所以界面上写的是「删除云端学习数据」而不是「注销账号」,不夸大能力。
+ */
+export async function deleteCloudData(): Promise<void> {
+  const userId = currentUserId();
+  await rest(`/backups?user_id=eq.${userId}`, { method: 'DELETE' });
+  await rest(`/profiles?id=eq.${userId}`, { method: 'DELETE' });
+  // 云端已空 → 清掉同步基线,避免下次自动同步又把本机推上去
+  await saveSyncState({ lastHash: '', lastPushedAt: 0, lastPulledAt: 0 });
+}
+
 /** 读取云端昵称 / 头像(没有则返回 null) */
 export async function pullProfile(): Promise<{ nickname: string; avatar: string } | null> {
   const userId = currentUserId();

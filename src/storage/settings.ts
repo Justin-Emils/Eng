@@ -32,6 +32,8 @@ interface SettingsStore {
   onboarded: boolean;
   /** 本地昵称(无账号体系,纯本地展示) */
   nickname?: string;
+  /** 阅读页字号(P2 缺口:以前只存在组件 state,退出即回到 19) */
+  fontSize?: number;
 }
 
 const DEFAULTS: SettingsStore = {
@@ -78,6 +80,10 @@ async function patch(part: Partial<SettingsStore>): Promise<void> {
 }
 
 /** 更新每日目标 */
+export async function saveFontSize(size: number): Promise<void> {
+  await patch({ fontSize: size });
+}
+
 export async function saveDailyGoal(goal: DailyGoal): Promise<void> {
   await patch({ dailyGoal: { ...goal } });
 }

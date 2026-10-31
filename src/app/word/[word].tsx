@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { speak } from '@/domain/speech';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { offlineDictionary } from '@/domain/dictionary';
@@ -151,9 +152,14 @@ export default function WordDetailScreen() {
               ) : null}
               <View style={styles.headRow}>
                 <View style={styles.titleCol}>
-                  <ThemedText type="title" style={styles.word}>
-                    {entry.headword}
-                  </ThemedText>
+                  <Pressable
+                    onPress={() => void speak(entry.headword)}
+                    hitSlop={10}
+                    style={({ pressed }) => pressed && styles.pressed}>
+                    <ThemedText type="title" style={styles.word}>
+                      {entry.headword} 🔊
+                    </ThemedText>
+                  </Pressable>
                   {entry.phonetic ? (
                     <ThemedText themeColor="textSecondary" style={styles.phonetic}>
                       /{entry.phonetic}/
@@ -200,9 +206,14 @@ export default function WordDetailScreen() {
             </>
           ) : (
             <>
-              <ThemedText type="title" style={styles.word}>
-                {result?.query ?? rawWord}
-              </ThemedText>
+              <Pressable
+                onPress={() => void speak(result?.query ?? rawWord)}
+                hitSlop={10}
+                style={({ pressed }) => pressed && styles.pressed}>
+                <ThemedText type="title" style={styles.word}>
+                  {result?.query ?? rawWord} 🔊
+                </ThemedText>
+              </Pressable>
               <ThemedView type="backgroundElement" style={styles.exampleBox}>
                 <ThemedText type="small" themeColor="textSecondary">
                   {result?.hint ?? '离线词典未收录该词。'}

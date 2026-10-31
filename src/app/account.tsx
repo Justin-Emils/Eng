@@ -17,7 +17,7 @@ import { signOut } from '@/domain/auth/store';
 import { describeBackup, exportBackup, importBackup } from '@/domain/backup';
 import { describeLastSync } from '@/domain/autosync';
 import { clockVerified, describeClock } from '@/domain/clock';
-import { adoptLocalDataToCurrentAccount, getOwnershipStatus, pullBackup, pushBackup, pushProfile, restoreFromCloud } from '@/domain/sync';
+import { adoptLocalDataToCurrentAccount, deleteCloudData, getOwnershipStatus, pullBackup, pushBackup, pushProfile, restoreFromCloud } from '@/domain/sync';
 import type { OwnershipCheck } from '@/domain/ownership';
 import { clearLocalOwner } from '@/storage/local-owner';
 import { useAuth } from '@/hooks/use-auth';
@@ -349,6 +349,40 @@ export default function AccountScreen() {
     }
   };
 
+  /**
+   * 删除云端学习数据(P2-2 的可落地部分)。
+   * 能删:backups / profiles 两张表的行;删不掉:登录身份(auth.users,需要服务端权限)。
+   * 文案如实说明,不写成"注销账号"。
+   */
+  const handleDeleteCloud = () => {
+    Alert.alert(
+      '删除云端学习数据?',
+      '将删除云端备份与昵称/头像,不可恢复。\n\n本机数据不受影响;登录身份(邮箱账号)需要人工删除,可在「隐私政策」页看到说明。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除云端数据',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              setSyncBusy(true);
+              setSyncNote(null);
+              try {
+                await deleteCloudData();
+                setSyncNote('✓ 云端学习数据已删除');
+                await refreshCloud();
+              } catch (e) {
+                setSyncNote(`✗ 删除失败:${e instanceof Error ? e.message : '未知错误'}`);
+              } finally {
+                setSyncBusy(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  };
+
   const handleSignOut = () => {
     Alert.alert('退出登录?', '退出只影响云端同步,本机的生词和进度都会保留。', [
       { text: '取消', style: 'cancel' },
@@ -556,6 +590,14 @@ export default function AccountScreen() {
                 value={syncBusy ? '处理中…' : '同步 ›'}
                 onPress={() => {
                   if (!syncBusy) void handleCloudUpload();
+                }}
+              />
+              <SettingRow
+                label="删除云端学习数据"
+                sublabel="删除云端备份与昵称/头像(不可恢复;登录身份需人工删除)"
+                value={syncBusy ? '处理中…' : '删除 ›'}
+                onPress={() => {
+                  if (!syncBusy) handleDeleteCloud();
                 }}
               />
               <SettingRow

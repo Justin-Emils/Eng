@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/empty-state';
 import { Medallion } from '@/components/ornaments';
 import { ThemedText } from '@/components/themed-text';
+import { speak } from '@/domain/speech';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { getArticleById } from '@/data/articles';
@@ -376,9 +377,11 @@ export default function ReviewScreen() {
           {/* 中部:单词 + 例句提示 */}
           <View style={styles.recallWrap}>
             <Pressable onPress={() => setHintOn((v) => !v)} style={styles.wordBox}>
-              <ThemedText type="title" style={styles.wordText}>
-                {current.headword}
-              </ThemedText>
+              <Pressable onPress={() => void speak(current.headword)} hitSlop={12}>
+                <ThemedText type="title" style={styles.wordText}>
+                  {current.headword} 🔊
+                </ThemedText>
+              </Pressable>
               <ThemedText themeColor="textSecondary" style={styles.phonetic}>
                 {current.pos}
                 {sourceTitle ? ` · 来自《${sourceTitle}》` : ''}

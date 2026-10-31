@@ -1,0 +1,52 @@
+# ⚠️ 这是**模板**,不是生效的 CI。
+#
+# 为什么放在 docs/ci/:当前 git 凭据是 Personal Access Token,没有 workflow 权限,
+# 无法推送 .github/workflows/ 下的文件(GitHub 会直接拒绝)。
+#
+# 启用:GitHub 网页 → Add file → Create new file →
+#   路径填 .github/workflows/ci.yml → 粘贴本文件内容 → Commit
+#
+# 它做什么:每次 push / PR 跑一遍仓库里已有的**手工验证脚本**与类型检查。
+# 报告 P2-13 指出"没有自动化测试、没有 CI" —— 这里的 5 个 verify 脚本其实就是
+# 现成的回归用例(共 75 项断言),接进 CI 就能拦住"哈希包含时间戳"这类回归。
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request: {}
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install deps
+        run: npm ci --no-audit --no-fund
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint src
+
+      # 这些是纯逻辑脚本,在 Node 里直接跑,不需要 Android/iOS 工具链
+      - name: Verify (P0-1 指纹)
+        run: node scripts/verify-fingerprint.mjs
+      - name: Verify (P0-2 登录同步方向)
+        run: node scripts/verify-login-sync.mjs
+      - name: Verify (P1-2 标蓝判定)
+        run: node scripts/verify-marking.mjs
+      - name: Verify (P1-3 文章合并)
+        run: node scripts/verify-article-merge.mjs
+      - name: Verify (B1 邮箱校验)
+        run: node scripts/verify-email.mjs
