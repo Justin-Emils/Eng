@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SpeakerButton } from '@/components/speaker-button';
 import { ThemedText } from '@/components/themed-text';
-import { speak } from '@/domain/speech';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
 import { offlineDictionary } from '@/domain/dictionary';
@@ -152,23 +152,20 @@ export default function WordDetailScreen() {
               ) : null}
               <View style={styles.headRow}>
                 <View style={styles.titleCol}>
-                  <Pressable
-                    onPress={() => void speak(entry.headword)}
-                    hitSlop={10}
-                    style={({ pressed }) => pressed && styles.pressed}>
-                    <ThemedText type="title" style={styles.word}>
-                      {entry.headword} 🔊
-                    </ThemedText>
-                  </Pressable>
-                  {entry.phonetic ? (
-                    <ThemedText themeColor="textSecondary" style={styles.phonetic}>
-                      /{entry.phonetic}/
-                    </ThemedText>
-                  ) : null}
+                  <ThemedText type="title" style={styles.word}>
+                    {entry.headword}
+                  </ThemedText>
                 </View>
                 <ThemedText type="smallBold" themeColor="accent" style={styles.pos}>
                   {entry.pos}
                 </ThemedText>
+              </View>
+              {/* 音标在下、发音按钮在右(反馈要求的排版) */}
+              <View style={styles.phoneticRow}>
+                <ThemedText themeColor="textSecondary" style={styles.phonetic}>
+                  {entry.phonetic ? `/${entry.phonetic}/` : '暂无音标'}
+                </ThemedText>
+                <SpeakerButton word={entry.headword} size={14} />
               </View>
 
               {result?.status === 'inflected' && result.query !== entry.headword ? (
@@ -206,14 +203,16 @@ export default function WordDetailScreen() {
             </>
           ) : (
             <>
-              <Pressable
-                onPress={() => void speak(result?.query ?? rawWord)}
-                hitSlop={10}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedText type="title" style={styles.word}>
-                  {result?.query ?? rawWord} 🔊
+              <ThemedText type="title" style={styles.word}>
+                {result?.query ?? rawWord}
+              </ThemedText>
+              {/* 未收录词也能听发音(系统 TTS 不依赖词典) */}
+              <View style={styles.phoneticRow}>
+                <ThemedText themeColor="textSecondary" style={styles.phonetic}>
+                  暂无音标
                 </ThemedText>
-              </Pressable>
+                <SpeakerButton word={result?.query ?? rawWord} size={14} />
+              </View>
               <ThemedView type="backgroundElement" style={styles.exampleBox}>
                 <ThemedText type="small" themeColor="textSecondary">
                   {result?.hint ?? '离线词典未收录该词。'}
@@ -336,6 +335,13 @@ const styles = StyleSheet.create({
   },
   mainCard: {
     gap: Spacing.two,
+  },
+  phoneticRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    marginTop: 2,
   },
   headRow: {
     flexDirection: 'row',

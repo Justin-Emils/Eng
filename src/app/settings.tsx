@@ -18,6 +18,13 @@ import {
   type ThemeId,
 } from '@/constants/theme';
 import { APP_VERSION } from '@/domain/app-version';
+import {
+  REMINDER_HOURS,
+  describeReminder,
+  syncReminder,
+  updateReminderSetting,
+  type ReminderState,
+} from '@/domain/reminders';
 import { wordsToCsv } from '@/domain/export';
 import { DEFAULT_USER_VOCAB } from '@/domain/levels';
 import { useDailyCorpus } from '@/hooks/use-daily-corpus';
@@ -74,6 +81,36 @@ export default function SettingsScreen() {
    * (之前正是这个原因:tag 一路发到 v1.0.12,而这里一直显示 1.0.0)。
    * 开发环境下额外标注「开发版」,方便和 GitHub 上已发布的 Release 区分。
    */
+  /** 复习提醒状态(本地通知) */
+  const [reminder, setReminder] = useState<ReminderState | null>(null);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderHour, setReminderHour] = useState(20);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const st = await getSettings();
+      if (!active) return;
+      setReminderEnabled(st.reminderEnabled === true);
+      setReminderHour(typeof st.reminderHour === 'number' ? st.reminderHour : 20);
+      // 顺手重排一次:到期词数可能已经变了
+      setReminder(await syncReminder());
+    })().catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const applyReminder = (next: { enabled?: boolean; hour?: number }) => {
+    void (async () => {
+      const enabled = next.enabled ?? reminderEnabled;
+      const hour = next.hour ?? reminderHour;
+      setReminderEnabled(enabled);
+      setReminderHour(hour);
+      setReminder(await updateReminderSetting({ enabled, hour: hour as 8 | 12 | 20 }));
+    })();
+  };
+
   const appVersionText = `v${APP_VERSION}${__DEV__ ? '(开发版)' : ''}`;
 
   /**
@@ -347,6 +384,37 @@ export default function SettingsScreen() {
           />
         </ThemedView>
 
+        {/* ── 复习提醒 ── */}
+        <SectionTitle text="复习提醒" />
+        <ThemedView type="backgroundElement" frame="playbill" style={styles.list}>
+          <SettingRow
+            label="每日复习提醒"
+            sublabel={reminder ? describeReminder(reminder) : '读取中…'}
+            value={reminderEnabled ? '已开启' : '已关闭'}
+            onPress={() => applyReminder({ enabled: !reminderEnabled })}
+            last={!reminderEnabled}
+          />
+          {reminderEnabled ? (
+            <View style={styles.reminderHours}>
+              {REMINDER_HOURS.map((h) => {
+                const active = reminderHour === h;
+                return (
+                  <Pressable key={h} onPress={() => applyReminder({ hour: h })}>
+                    <ThemedView
+                      type={active ? 'backgroundSelected' : 'backgroundElement'}
+                      radius="chip"
+                      style={[styles.reminderChip, active && { borderColor: theme.accent }]}>
+                      <ThemedText type="smallBold" themeColor={active ? 'accent' : 'textSecondary'}>
+                        {String(h).padStart(2, '0')}:00
+                      </ThemedText>
+                    </ThemedView>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+        </ThemedView>
+
         {/* ── 关于 ── */}
         <SectionTitle text="关于" />
         <ThemedView type="backgroundElement" frame="playbill" style={styles.list}>
@@ -490,6 +558,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.two,
     gap: Spacing.three,
+  },
+  reminderHours: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.three,
+  },
+  reminderChip: {
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   sectionTitle: { marginTop: Spacing.two, marginLeft: Spacing.one },
   list: { borderRadius: Radii.card, paddingHorizontal: Spacing.three },

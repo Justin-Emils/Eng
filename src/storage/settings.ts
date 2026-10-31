@@ -34,6 +34,10 @@ interface SettingsStore {
   nickname?: string;
   /** 阅读页字号(P2 缺口:以前只存在组件 state,退出即回到 19) */
   fontSize?: number;
+  /** 是否开启每日复习提醒(本地通知) */
+  reminderEnabled?: boolean;
+  /** 提醒时间(整点,24 小时制) */
+  reminderHour?: number;
 }
 
 const DEFAULTS: SettingsStore = {
@@ -66,6 +70,8 @@ export async function getSettings(): Promise<SettingsStore> {
       theme: normalizeTheme(parsed.theme),
       themeId: normalizeThemeId(parsed.themeId),
       onboarded: parsed.onboarded === true,
+      reminderEnabled: parsed.reminderEnabled === true,
+      reminderHour: typeof parsed.reminderHour === 'number' ? parsed.reminderHour : 20,
       nickname: typeof parsed.nickname === 'string' ? parsed.nickname : undefined,
     };
   } catch {
@@ -80,6 +86,10 @@ async function patch(part: Partial<SettingsStore>): Promise<void> {
 }
 
 /** 更新每日目标 */
+export async function saveReminder(enabled: boolean, hour: number): Promise<void> {
+  await patch({ reminderEnabled: enabled, reminderHour: hour });
+}
+
 export async function saveFontSize(size: number): Promise<void> {
   await patch({ fontSize: size });
 }

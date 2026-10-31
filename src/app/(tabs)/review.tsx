@@ -5,8 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
 import { Medallion } from '@/components/ornaments';
+import { SpeakerButton } from '@/components/speaker-button';
 import { ThemedText } from '@/components/themed-text';
-import { speak } from '@/domain/speech';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { getArticleById } from '@/data/articles';
@@ -22,6 +22,7 @@ import {
 import { getAllLearningWords, getDueWords, updateWordReview } from '@/storage/words';
 import { recordReviewResult } from '@/storage/review-stats';
 import { getSettings } from '@/storage/settings';
+import { syncReminder } from '@/domain/reminders';
 import { now as clockNow } from '@/domain/clock';
 import { useTheme, useThemeSkin } from '@/hooks/use-theme';
 import type { WordItem } from '@/types';
@@ -160,6 +161,8 @@ export default function ReviewScreen() {
   };
 
   const finishToIdle = async () => {
+    // 复习完到期词数变了,重排每日提醒
+    void syncReminder();
     setPhase('idle');
     requeuedRef.current = new Set();
     const [due, learning] = await Promise.all([getDueWords(), getAllLearningWords()]);
@@ -377,15 +380,17 @@ export default function ReviewScreen() {
           {/* 中部:单词 + 例句提示 */}
           <View style={styles.recallWrap}>
             <Pressable onPress={() => setHintOn((v) => !v)} style={styles.wordBox}>
-              <Pressable onPress={() => void speak(current.headword)} hitSlop={12}>
-                <ThemedText type="title" style={styles.wordText}>
-                  {current.headword} 🔊
-                </ThemedText>
-              </Pressable>
-              <ThemedText themeColor="textSecondary" style={styles.phonetic}>
-                {current.pos}
-                {sourceTitle ? ` · 来自《${sourceTitle}》` : ''}
+              <ThemedText type="title" style={styles.wordText}>
+                {current.headword}
               </ThemedText>
+              {/* 音标位置留给词性/来源;发音按钮固定在右侧(与词条卡片同一套排版) */}
+              <View style={styles.phoneticRow}>
+                <ThemedText themeColor="textSecondary" style={styles.phonetic}>
+                  {current.pos}
+                  {sourceTitle ? ` · 来自《${sourceTitle}》` : ''}
+                </ThemedText>
+                <SpeakerButton word={current.headword} size={14} />
+              </View>
               <ThemedText type="small" themeColor="textSecondary" style={styles.hintToggle}>
                 {hintOn ? '点此隐藏例句提示' : '点这里看含该词的例句(提示,不给释义)'}
               </ThemedText>
@@ -604,6 +609,11 @@ const styles = StyleSheet.create({
     fontSize: 42,
     lineHeight: 52,
     textAlign: 'center',
+  },
+  phoneticRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   phonetic: {
     textAlign: 'center',

@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Modal, Pressable, StyleSheet, View } from 'react-native';
 
+import { SpeakerButton } from '@/components/speaker-button';
 import { ThemedText } from '@/components/themed-text';
-import { speak } from '@/domain/speech';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, Spacing } from '@/constants/theme';
 import type { LookupResult } from '@/domain/dictionary';
@@ -115,19 +115,22 @@ export function DictCard({
                     <ThemedText type="subtitle" style={styles.word}>
                       {entry.headword}
                     </ThemedText>
-                    <Pressable
-                      onPress={() => void speak(entry.headword)}
-                      hitSlop={10}
-                      style={({ pressed }) => pressed && styles.pressed}>
-                      <ThemedText type="small" themeColor="accent">
-                        {entry.phonetic ? `/${entry.phonetic}/` : '听听发音'}
-                        {'  '}🔊
-                      </ThemedText>
-                    </Pressable>
                   </View>
                   <ThemedText type="smallBold" themeColor="accent">
                     {entry.pos}
                   </ThemedText>
+                </View>
+
+                {/*
+                  音标在下、喇叭在右(反馈要求)。
+                  之前是把 🔊 emoji 拼在单词后面 —— emoji 的字体/颜色不受主题控制,
+                  深色主题里很跳;现在换成字体图标 + 主题色描边小底。
+                */}
+                <View style={styles.phoneticRow}>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {entry.phonetic ? `/${entry.phonetic}/` : '暂无音标'}
+                  </ThemedText>
+                  <SpeakerButton word={entry.headword} />
                 </View>
 
                 {result.status === 'inflected' ? (
@@ -253,6 +256,12 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
     marginBottom: Spacing.one,
+  },
+  phoneticRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
   },
   headRow: {
     flexDirection: 'row',

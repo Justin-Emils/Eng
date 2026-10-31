@@ -14,6 +14,7 @@ import { hydrateRemoteArticles } from '@/data/articles/remote-registry';
 import { getAuthState, hydrateAuth } from '@/domain/auth/store';
 import { ensureDailyCorpusUpdate } from '@/domain/corpus/update';
 import { maybeAutoSync } from '@/domain/autosync';
+import { syncReminder } from '@/domain/reminders';
 import { autoSyncAfterLogin } from '@/domain/sync';
 import { useResolvedScheme, useTheme } from '@/hooks/use-theme';
 import { hydrateThemePrefs } from '@/hooks/use-theme-pref';
@@ -127,6 +128,8 @@ export default function RootLayout() {
     if (!bootChecked) return;
     const run = () => {
       void maybeAutoSync();
+      // 提醒跟着到期词数走:没到期词就不排,避免"每天准时骚扰但没东西可复习"
+      void syncReminder();
     };
     run();
     const timer = setInterval(run, 60_000);

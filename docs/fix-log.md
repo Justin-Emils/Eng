@@ -254,3 +254,12 @@ npx tsc --noEmit ; npx eslint src       # 0 errors / 0 warnings
 | **R8 / minify**(P2-3c) | **试了,决定不开**:构建能过,但包体 48.66→48.84 MB(反而略增),且无法真机验证混淆是否破坏运行时。交付版保持 R8 关闭,1.1.18 仅作试验包 | 两版体积对比 |
 
 **仍未做(需要决策或服务端能力)**:账号注销(需 Edge Function/service_role)、应用内自动更新、TTS 语速/口音设置、复习提醒(需 expo-notifications)、学习报告/错题本、撤销、法务文本定稿。
+
+
+## 第三轮(1.1.20)
+
+| 项 | 处置 |
+|---|---|
+| **发音排版重做**(按反馈) | 音标小字在下、发音按钮在右;按钮用 `@expo/vector-icons` 的 Feather `volume-2`(细线条,与衬线主题协调)+ 主题色描边小底,替掉 emoji 🔊。词条卡片 / 词条详情 / 复习卡三处统一 |
+| **每日复习提醒** | 新增 `domain/reminders.ts`(expo-notifications 本地通知):三档时间 08/12/20 点、**只在该时间有到期词时才排**、复习完成后自动重排;权限被拒时界面如实提示。设置页新增「复习提醒」区块 |
+| 依赖 | 新增 `@expo/vector-icons`、`expo-notifications`;app.json 自动加 `expo-notifications` 插件(带 POST_NOTIFICATIONS 权限) |
