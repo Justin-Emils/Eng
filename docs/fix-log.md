@@ -302,3 +302,29 @@ node scripts/verify-phonetics.mjs  → 15/15
   无西里尔形近字 / 无 ASCII 冒号 / 无包裹符号 / 无「词根(后缀)」占位
   抽样:abandon=əˈbændən · the=ðə · and=ænd · cheaper=tʃiːpə · clearest=kliərɪst
 ```
+
+
+---
+
+## 第五轮(1.1.22):真机走查(adb)发现的问题
+
+用 `adb` 在小米 14 Pro 上跑 1.1.20 实测(截图 + uiautomator 树 + logcat),发现并修复:
+
+| # | 现象(实机证据) | 根因 | 修复 |
+|---|---|---|---|
+| 1 | 文章库公版卡标题是残句:`Across courtesy white palaces fashionable E…`、`I' ve nice place here said eyes flashing ab…` | `annotateBlock(block, bookTitle, …)` **收了书名参数却没用**,标题改成"正文前 8 个词";`titleFromText` 还会拆掉撇号(→ "I' ve") | 用真实书名;撇号保留;并对**已缓存的旧文章**在 `loadRemoteArticles` 里就地修复(书名取自 `credit` 的 `Project Gutenberg · 书名 · Public Domain`) |
+| 2 | 复习页自相矛盾:`生词本有 7 词可复习` 配 `只复习到期词 9 个` | `getAllLearningWords()` 只取 new/learning,而 `getDueWords()` 在 P1-11 之后**包含到期的 mastered 词** | 统一为"除 ignored 以外的全部词";到期数==总数时只留一个按钮 |
+| 3 | 首页 `继续阅读 · 已读 100%` | `recentReading.find(...)` 没排除已读完 | 优先未读完;全都读完时改称「重读上一篇」 |
+| 4 | 「为你挑选」配「太难 · B2+ 需词汇量 5332」自相矛盾 | 库里只有 22 篇内置,不可能总落在 93–96% 区间,但界面不解释 | 低于目标区间时加一句「库里暂时没有更贴合你水平的,这几篇最接近(会偏难)」 |
+| 5 | 4460 词的用户被建议「先补 中考水平」 | `roiSuggestion` 只按"每词多认识多少文本"排序,低档词更高频 → 永远胜出,没排除低于用户水平的档位 | 只考虑 `threshold > vocab - 300` 的档位;全部低于时才兜底 |
+
+**顺带确认(设备实测)**
+- 查 `the` 的音标显示 `/ðə/` —— 1.1.21 的核心词表兜底生效(CORE_DICT 以前 0 音标)
+- 性能:6894 帧中 5 帧掉帧(0.07%),p50 7ms / p99 15ms,0 missed vsync
+- 内存 405 MB(Java 35 / Native 122 / Graphics 52)
+- 整段会话 0 崩溃、0 ReactNativeJS 警告
+
+**未改但记录在案的观察**
+- 文章库分区计数「2 篇」在主题手写体里"2"形似 `)`,可读性差(字体问题,非逻辑 bug)
+- 阅读页封面占掉约 1/2 屏,首段要滑到 1500px 才出现;首次读后可考虑收起封面
+- 当 `gainPerWord` 很小(实测 0.006%/词)时,"先补 X 水平"的收益有限,可改成"多读比背词更划算"

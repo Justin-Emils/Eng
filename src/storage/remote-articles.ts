@@ -24,13 +24,45 @@ interface StoreShape {
 }
 
 /** 读取远程文章 + 最近更新时间 */
+/**
+ * 修复已缓存的公版文章标题。
+ *
+ * 旧版本的标题是"正文前 8 个词"(如 "I' ve nice place here said eyes flashing ab…"),
+ * 因为 `annotateBlock` 收了 `bookTitle` 参数却没有使用(已修)。
+ * 但**已经缓存在本机的文章不会因为改代码自动变好** —— 合又是按 id 保留旧的。
+ *
+ * 书名其实就在数据里:`source` 形如 "Project Gutenberg · The Great Gatsby · Public Domain"。
+ * 所以这里在读取时做一次就地修复(不需要联网、不需要清缓存)。
+ */
+function repairGutenbergTitles(articles: Article[]): { articles: Article[]; changed: number } {
+  let changed = 0;
+  const out = articles.map((a) => {
+    if (!a.id.startsWith('gutenberg-')) return a;
+    // 优先从 source 里取书名(格式最稳定)
+    let book: string | undefined;
+    const creditParts = (a.credit ?? '').split(' · ').map((x: string) => x.trim());
+    if (creditParts.length >= 2 && creditParts[1]) book = creditParts[1];
+    // 退化:summary 以 "书名. 正文…" 开头
+    if (!book) {
+      const m = /^([^.\n]{2,90})\.\s/.exec(a.summary ?? '');
+      if (m) book = m[1].trim();
+    }
+    if (!book || book === a.title) return a;
+    changed += 1;
+    return { ...a, title: book };
+  });
+  return { articles: out, changed };
+}
+
 export async function loadRemoteArticles(): Promise<StoreShape> {
   try {
     const raw = await AsyncStorage.getItem(KEY);
     if (!raw) return { updatedDate: '', articles: [] };
     const parsed = JSON.parse(raw) as StoreShape;
     if (!Array.isArray(parsed.articles)) return { updatedDate: '', articles: [] };
-    return parsed;
+    // 修复旧缓存里"正文片段当标题"的文章(见 repairGutenbergTitles)
+    const repaired = repairGutenbergTitles(parsed.articles);
+    return { updatedDate: parsed.updatedDate, articles: repaired.articles };
   } catch {
     return { updatedDate: '', articles: [] };
   }

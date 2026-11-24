@@ -313,7 +313,8 @@ export default function ReviewScreen() {
                   </ThemedText>
                 </ThemedView>
               </Pressable>
-              {dueCount > 0 ? (
+              {/* 到期数 == 可复习总数时,两个按钮效果完全相同,只留上面那个 */}
+              {dueCount > 0 && dueCount < learningCount ? (
                 <Pressable
                   onPress={() => void startReview('due')}
                   style={({ pressed }) => pressed && styles.pressed}>
@@ -323,11 +324,11 @@ export default function ReviewScreen() {
                     </ThemedText>
                   </ThemedView>
                 </Pressable>
-              ) : (
+              ) : dueCount === 0 ? (
                 <ThemedText type="small" themeColor="textSecondary">
                   目前没有按计划到期的词
                 </ThemedText>
-              )}
+              ) : null}
             </View>
           ) : null}
         </View>

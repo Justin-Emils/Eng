@@ -75,6 +75,8 @@ export default function TodayScreen() {
     article: Article;
     progress: ReadingProgress;
   } | null>(null);
+  /** 最近一篇已读完时,卡片改称「重读上一篇」(否则会出现"继续阅读 · 已读 100%") */
+  const [continueIsReread, setContinueIsReread] = useState(false);
   const [userLevel, setUserLevel] = useState<UserLevel>(DEFAULT_USER_LEVEL);
   const [learned, setLearned] = useState<ReadonlySet<string>>(new Set());
   const [known, setKnown] = useState<ReadonlySet<string>>(new Set());
@@ -123,10 +125,19 @@ export default function TodayScreen() {
     setMasteredCount(allWords.filter((w) => w.status === 'mastered' || w.status === 'ignored').length);
     setStreak(computeStreak(dateKeys));
 
-    // 最近读过的一篇(含已读完);若该篇已下架,则继续往前找一篇还在的
-    const first = recentReading.find((p) => getArticleById(p.articleId));
+    /**
+     * 最近读过的一篇;若该篇已下架,则继续往前找一篇还在的。
+     *
+     * 优先取**没读完**的:以前会拿刚读完的那篇,于是首页出现
+     * "继续阅读 · 已读 100%"(实机截图确认),语义上很怪。
+     * 全都读完时保留最近一篇,但标签改成「重读」。
+     */
+    const available = recentReading.filter((p) => getArticleById(p.articleId));
+    const firstUnfinished = available.find((p) => !p.completed);
+    const first = firstUnfinished ?? available[0];
     const article = first ? getArticleById(first.articleId) : undefined;
     setContinueReading(first && article ? { article, progress: first } : null);
+    setContinueIsReread(Boolean(first && !firstUnfinished));
   }, []);
 
   useFocusEffect(
@@ -335,7 +346,7 @@ export default function TodayScreen() {
                 style={({ pressed }) => pressed && styles.pressed}>
                 <ThemedView type="backgroundElement" frame="playbill" style={styles.card}>
                   <ThemedText type="label" themeColor="textSecondary" style={styles.cardHead2}>
-                    继续阅读
+                    {continueIsReread ? '重读上一篇' : '继续阅读'}
                   </ThemedText>
                   <View style={styles.continueRow}>
                     <View style={styles.continueCover}>
@@ -380,6 +391,17 @@ export default function TodayScreen() {
                 </ThemedText>
               </Pressable>
             </View>
+
+            {/**
+              * 库里只有 22 篇内置 + 每日公版,不可能总是命中 93%–96% 的目标区间。
+              * 当最靠前的一篇也低于下限时,卡片会标「太难」——如果不解释,
+              * 就会出现"为你挑选"配"太难"的自相矛盾(实机截图确认)。
+              */}
+            {picks.length > 0 && picks[0].coverage < 0.93 ? (
+              <ThemedText type="caption" themeColor="textSecondary" style={styles.pickHint}>
+                库里暂时没有更贴合你水平的,下面这几篇是最接近的(会偏难,先靠高亮词补)
+              </ThemedText>
+            ) : null}
 
             {picks.length === 0 ? (
               <EmptyState
@@ -524,6 +546,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.one,
     alignItems: 'center',
     gap: 2,
+  },
+  pickHint: {
+    marginTop: -4,
+    marginBottom: 2,
+    lineHeight: 19,
   },
   pressed: { opacity: 0.85 },
 });

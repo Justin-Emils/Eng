@@ -309,9 +309,21 @@ export function bandRoi(
 }
 
 /** 由 ROI 数据生成建议:优先性价比最高的档位,并说明与"缺口最大档"的取舍 */
-function roiSuggestion(roi: BandRoi[], gapThreshold: number | null): { advice: string; trait: ProfileTrait | null } | null {
-  // 样本太小的档位不参与比较(3 个词算出的性价比没有意义)
-  const candidates = roi.filter((r) => r.unknownUnique >= 15);
+function roiSuggestion(
+  roi: BandRoi[],
+  gapThreshold: number | null,
+  userVocab: number,
+): { advice: string; trait: ProfileTrait | null } | null {
+  /**
+   * 样本太小的档位不参与比较(3 个词算出的性价比没有意义)。
+   *
+   * **还要排除明显低于用户水平的档位**:以前的"性价比"只看"每学一个词能多认识多少文本",
+   * 而低档词更高频,于是 4460 词的用户被建议"先补中考水平"(实机截图确认)—— 那些词他本来就会。
+   * 现在只考虑门槛高于 `vocab - 300` 的档位;全都低于时仍允许兜底(否则没有建议)。
+   */
+  const above = (r: BandRoi) => r.threshold > userVocab - 300;
+  const eligible = roi.filter((r) => r.unknownUnique >= 15 && above(r));
+  const candidates = eligible.length > 0 ? eligible : roi.filter((r) => r.unknownUnique >= 15);
   if (candidates.length === 0) return null;
 
   const best = candidates.reduce((a, b) => (b.gainPerWord > a.gainPerWord ? b : a));
@@ -422,7 +434,7 @@ export function buildLearnerProfile(
   const behaviorResult = options.behavior ? behaviorTraits(options.behavior) : { traits: [], advice: null };
   // 有语料数据时,用"投入产出比"取代"缺口最大"作为补词建议的口径
   const roiResult =
-    options.roi && options.roi.length > 0 ? roiSuggestion(options.roi, gapThreshold) : null;
+    options.roi && options.roi.length > 0 ? roiSuggestion(options.roi, gapThreshold, vocab) : null;
 
   // 建议优先级:先清复习积压(今天就能动手)> 补词性价比(投入产出比)> 词汇曲线兜底
   const suggestion = behaviorResult.advice ?? roiResult?.advice ?? vocabAdvice;

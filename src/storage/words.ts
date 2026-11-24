@@ -69,9 +69,16 @@ export async function getDueWords(now = clockNow()): Promise<WordItem[]> {
 
 /** 全部"学习中的词"(new/learning),忽略到期时间——用于"立即复习" */
 export async function getAllLearningWords(): Promise<WordItem[]> {
+  /**
+   * "可复习"= 除 ignored(用户点过"我会了")以外的全部词。
+   *
+   * 以前只取 new/learning,但 `getDueWords` 在 P1-11 之后**包含到期的 mastered 词**
+   * (已巩固的词按 60/120/240 天间隔回来),于是出现"生词本有 7 词可复习 / 只复习到期词 9 个"
+   * 这种自相矛盾的界面(实机截图确认)。两处口径必须一致。
+   */
   const words = await getWords();
   return words
-    .filter((w) => w.status === 'new' || w.status === 'learning')
+    .filter((w) => w.status !== 'ignored')
     .sort((a, b) => a.review.dueAt - b.review.dueAt);
 }
 

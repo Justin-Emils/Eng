@@ -20,7 +20,12 @@ export interface CandidateBlock {
 
 /** 从一段文本生成标题(取前几个实词大写) */
 export function titleFromText(text: string, max = 8): string {
-  const words = extractWords(text).filter((w) => w.length > 3);
+  /**
+   * 兜底标题(只有拿不到书名时才会用)。
+   * 注意保留词内撇号:以前用 extractWords 会把 "I've" 拆成 "I" + "ve",
+   * 生成 "I' ve nice place here…" 这种明显坏掉的标题(实机截图确认)。
+   */
+  const words = (text.match(/[A-Za-z][A-Za-z''-]*/g) ?? []).filter((w) => w.length > 3);
   const title = words.slice(0, max).join(' ');
   return title ? title.charAt(0).toUpperCase() + title.slice(1) : 'Untitled Passage';
 }
@@ -86,7 +91,7 @@ export function annotateBlock(
   const topicTags = tagsFromText(block.paragraphs) as RawArticle['topicTags'];
   return {
     id: blockId,
-    title: titleFromText(firstText) || blockId,
+    title: bookTitle.trim() || titleFromText(firstText) || blockId,
     summary,
     level,
     vocab,
