@@ -7,7 +7,7 @@ import { SpeakerButton } from '@/components/speaker-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, MaxContentWidth, Spacing } from '@/constants/theme';
-import { offlineDictionary } from '@/domain/dictionary';
+import { offlineDictionary, getPhonetic } from '@/domain/dictionary';
 import { isExternalWord } from '@/domain/external';
 import { useTheme } from '@/hooks/use-theme';
 import { useWordSaved } from '@/hooks/use-word-saved';
@@ -162,9 +162,13 @@ export default function WordDetailScreen() {
               </View>
               {/* 音标在下、发音按钮在右(反馈要求的排版) */}
               <View style={styles.phoneticRow}>
-                <ThemedText themeColor="textSecondary" style={styles.phonetic}>
-                  {entry.phonetic ? `/${entry.phonetic}/` : '暂无音标'}
-                </ThemedText>
+                {entry.phonetic ?? getPhonetic(entry.headword) ? (
+                  <ThemedText themeColor="textSecondary" style={styles.phonetic}>
+                    /{entry.phonetic ?? getPhonetic(entry.headword)}/
+                  </ThemedText>
+                ) : (
+                  <View />
+                )}
                 <SpeakerButton word={entry.headword} size={14} />
               </View>
 
@@ -208,9 +212,13 @@ export default function WordDetailScreen() {
               </ThemedText>
               {/* 未收录词也能听发音(系统 TTS 不依赖词典) */}
               <View style={styles.phoneticRow}>
-                <ThemedText themeColor="textSecondary" style={styles.phonetic}>
-                  暂无音标
-                </ThemedText>
+                {getPhonetic(result?.query ?? rawWord) ? (
+                  <ThemedText themeColor="textSecondary" style={styles.phonetic}>
+                    /{getPhonetic(result?.query ?? rawWord)}/
+                  </ThemedText>
+                ) : (
+                  <View />
+                )}
                 <SpeakerButton word={result?.query ?? rawWord} size={14} />
               </View>
               <ThemedView type="backgroundElement" style={styles.exampleBox}>

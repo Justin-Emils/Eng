@@ -24,8 +24,37 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "src" / "data" / "ext-words.ts"
 USERLIST = ROOT / "src" / "data" / "external-wordlist.ts"
 
-# 可接受的音标字符(ASCII + 常见 IPA 符号)
-PHONETIC_OK = re.compile(r"^[A-Za-z0-9 ˌˈ.\-əɪʊæɑɔɛʌɜːθðʃʒŋɡɒ'ˈ]+$", re.IGNORECASE)
+# 音标归一化。
+#
+# 旧版这里是一个极窄的白名单正则,不合格就**丢弃**音标;而 ECDICT 用的是西里尔
+# 形近字(ә U+04D9 而不是 ə、є 而不是 ɛ)和 ASCII 冒号(:代替 ː),
+# 结果是 4434/6798 条(65%)词条的音标被误判为"非法"而丢掉 ——
+# abandon / ability 这种基础词都显示"暂无音标"。
+#
+# 现在改为先归一化再校验:形近字映射成标准 IPA,去包裹符号,多写法取第一个。
+PHONETIC_MAP = {
+    "ә": "ə", "Ә": "ə", "є": "ɛ", "Є": "ɛ", "ө": "ə", "Ө": "ə",
+    "а": "ɑ", "е": "e", ":": "ː", "'": "ˈ", "’": "ˈ", ",": "ˌ",
+}
+PHONETIC_OK = re.compile(r"^[A-Za-z0-9 .\-ˈˌːəɪʊæɑɔɛʌɜθðʃʒŋɡɒɚɝɐɘɵøɨʉɯɤœɶʏʁħʕʔɫɾɹ]+$")
+
+
+def normalize_phonetic(raw: str) -> str:
+    if not raw:
+        return ""
+    s = raw.strip().strip("[]()/／\"'")
+    for sep in (";", "；"):
+        if sep in s:
+            s = s.split(sep)[0]
+    out = []
+    for ch in s.strip():
+        if ch in ("^", "\\", "(", ")", "[", "]", "/", "$", "+", "|", "́"):
+            continue
+        out.append(PHONETIC_MAP.get(ch, ch))
+    s = re.sub(r"\s+", " ", "".join(out)).strip().strip(".")
+    if not s or not re.search(r"[a-zA-Zæɑɒɔəɛɜɪʊʌɚɝ]", s):
+        return ""
+    return s if PHONETIC_OK.match(s) else ""
 
 
 def load_user_words():
@@ -70,9 +99,7 @@ def fetch_filter(user_words):
             if not zh and not en:
                 continue
             pos = (row.get("pos") or "").strip()
-            phonetic = (row.get("phonetic") or "").strip()
-            if phonetic and not PHONETIC_OK.match(phonetic):
-                phonetic = ""
+            phonetic = normalize_phonetic(row.get("phonetic") or "")
             entries[word] = {
                 "headword": word,
                 "phonetic": phonetic or None,

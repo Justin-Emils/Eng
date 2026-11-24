@@ -263,3 +263,42 @@ npx tsc --noEmit ; npx eslint src       # 0 errors / 0 warnings
 | **发音排版重做**(按反馈) | 音标小字在下、发音按钮在右;按钮用 `@expo/vector-icons` 的 Feather `volume-2`(细线条,与衬线主题协调)+ 主题色描边小底,替掉 emoji 🔊。词条卡片 / 词条详情 / 复习卡三处统一 |
 | **每日复习提醒** | 新增 `domain/reminders.ts`(expo-notifications 本地通知):三档时间 08/12/20 点、**只在该时间有到期词时才排**、复习完成后自动重排;权限被拒时界面如实提示。设置页新增「复习提醒」区块 |
 | 依赖 | 新增 `@expo/vector-icons`、`expo-notifications`;app.json 自动加 `expo-notifications` 插件(带 POST_NOTIFICATIONS 权限) |
+
+
+---
+
+## 第四轮(1.1.21):音标缺失修复
+
+**现象**:大量词条显示「暂无音标」,包括 abandon / ability / abnormal 这类基础词。
+
+**根因(两层,都是"丢弃"而不是"没有")**
+1. `scripts/fetch-ecdict-kaoyan.py` 用一个极窄的字符白名单校验音标,不合格就置空。
+   但 ECDICT 用的是**西里尔形近字**:`ә`(U+04D9)而非 `ə`(U+0259)、`є` 而非 `ɛ`、
+   ASCII `:` 而非 `ː`、`'` 作为重音符号。于是 4434/6798(65%)音标被误判丢弃。
+   实测证据:ky 词条抽样 4801 条里 4794 条**有**音标,只是 3131 次 `ә` + 1254 次 `:` 不在白名单里。
+2. 词典合并时三层数据(ext-words → CORE_DICT → 文章重点词)后两层覆盖释义时
+   **没有 phonetic 字段**,把底层音标一起盖掉;`CORE_DICT` 本身 0 音标(267 条全无),
+   所以 the / and 这类最常用的词反而是"暂无音标"。
+
+**修复**
+- 新增 `scripts/patch-phonetics.py`:把 ECDICT 音标**归一化**(形近字映射、去 `[]/()`、多写法取第一个)
+  后回填 ext-words,只改 phonetic 字段(最小 diff);
+- 新增 `scripts/gen-phonetics.py` → `src/data/phonetics.ts`(7706 条 / 202 KB,统一音标表):
+  覆盖 ext-words ∪ CORE_DICT ∪ 文章重点词 ∪ 文章正文词 ∪ 考研词形表;
+  空格/连字符复合词用部件拼接;派生词按英语音变规则推导
+  (`-ed` /d t ɪd/、`-s` /s z ɪz/、`-ing` /ɪŋ/、`-ly` /li/、`-ness` /nəs/、`-ment` /mənt/、`-er` /ə/、`-est` /ɪst/,词根以 ə/ɜ/ɑ 结尾时补连接 r);
+- `domain/dictionary.ts`:合并完成后统一用 `PHONETICS` 兜底补齐音标,并导出 `getPhonetic(word)`
+  (归一化 + 词形还原),供「未收录词」卡片使用;
+- UI:dict-card 与词条详情改用 `entry.phonetic ?? getPhonetic(...)`;真没有音标时**不再显示「暂无音标」**
+  (只留发音按钮),不再是满屏占位文字;
+- 顺手修好 `fetch-ecdict-kaoyan.py` 的归一化逻辑,以后重新生成不会再丢音标。
+
+**证据**
+```
+node scripts/verify-phonetics.mjs  → 15/15
+  ext-words 覆盖率 99.0%(6797 条中 6726 条有音标;修复前 35%)
+  CORE_DICT 239 条全部可查音标
+  文章重点词 174 个 100% 有音标
+  无西里尔形近字 / 无 ASCII 冒号 / 无包裹符号 / 无「词根(后缀)」占位
+  抽样:abandon=əˈbændən · the=ðə · and=ænd · cheaper=tʃiːpə · clearest=kliərɪst
+```

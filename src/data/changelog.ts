@@ -21,6 +21,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '1.1.21',
+    date: '2026-11-24',
+    title: '音标修复:查得到的词基本都有音标了',
+    notes: [
+      '之前约 65% 的词条显示「暂无音标」,包括 abandon、ability 这类基础词',
+      '根因:ECDICT 的音标用西里尔形近字(ә/є)和 ASCII 冒号,被旧的字符白名单误判为非法而丢弃',
+      '现在做归一化(ә→ə、:→ː、\'→ˈ)并去包裹符号,词条音标覆盖率 35% → 99%',
+      '另外发现词典合并时「内置核心词表」和「文章重点词」会把音标覆盖掉 —— 现在统一由音标表兜底',
+      '文章重点词、the/and 这类常用词都有音标了;未收录的词只要词表里有也能显示',
+      '派生词(cheaper / clearest / annoyed)按英语音变规则推导,不再空缺',
+    ],
+  },
+  {
     version: '1.1.20',
     date: '2026-10-31',
     title: '发音排版重做 + 每日复习提醒',

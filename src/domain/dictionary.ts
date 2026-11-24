@@ -7,6 +7,7 @@
 import { ARTICLES } from '@/data/articles';
 import { CORE_DICT, type DictEntry } from '@/data/dict-core';
 import { EXTERNAL_DICT } from '@/data/ext-words';
+import { PHONETICS } from '@/data/phonetics';
 import { lookupCandidates, normalizeWord } from '@/domain/wordmark';
 
 /** 查询结果 */
@@ -61,6 +62,34 @@ for (const article of ARTICLES) {
       example: kw.example,
     };
   }
+}
+
+/**
+ * 音标兜底。
+ *
+ * 为什么需要单独一遍:词典有三层(ext-words → CORE_DICT → 文章重点词),
+ * 后两层覆盖释义时**没有音标字段**,会把底层已有的音标一起覆盖掉;
+ * CORE_DICT 本身也不带音标。于是 the / and 这类最常用的词反而显示"暂无音标"。
+ *
+ * 做法:合并完成后统一查 `PHONETICS`(ECDICT 归一化后的标准 IPA)补齐。
+ */
+for (const [key, entry] of Object.entries(merged)) {
+  if (!entry.phonetic) {
+    const ipa = PHONETICS[key];
+    if (ipa) entry.phonetic = ipa;
+  }
+}
+
+/** 查单个词形的音标(归一化 + 词形还原兜底);没有则 undefined */
+export function getPhonetic(word: string): string | undefined {
+  const query = normalizeWord(word);
+  if (!query) return undefined;
+  if (PHONETICS[query]) return PHONETICS[query];
+  for (const candidate of lookupCandidates(query)) {
+    const hit = PHONETICS[candidate];
+    if (hit) return hit;
+  }
+  return undefined;
 }
 
 export class OfflineDictionaryService implements LookupService {

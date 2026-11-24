@@ -5,7 +5,7 @@ import { SpeakerButton } from '@/components/speaker-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Radii, Spacing } from '@/constants/theme';
-import type { LookupResult } from '@/domain/dictionary';
+import { getPhonetic, type LookupResult } from '@/domain/dictionary';
 import { useTheme } from '@/hooks/use-theme';
 import { useWordSaved } from '@/hooks/use-word-saved';
 
@@ -127,9 +127,13 @@ export function DictCard({
                   深色主题里很跳;现在换成字体图标 + 主题色描边小底。
                 */}
                 <View style={styles.phoneticRow}>
-                  <ThemedText type="small" themeColor="textSecondary">
-                    {entry.phonetic ? `/${entry.phonetic}/` : '暂无音标'}
-                  </ThemedText>
+                  {entry.phonetic ?? getPhonetic(entry.headword) ? (
+                    <ThemedText type="small" themeColor="textSecondary">
+                      /{entry.phonetic ?? getPhonetic(entry.headword)}/
+                    </ThemedText>
+                  ) : (
+                    <View />
+                  )}
                   <SpeakerButton word={entry.headword} />
                 </View>
 
